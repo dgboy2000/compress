@@ -7,20 +7,60 @@
 using namespace std;
 
 class DATCompression {
+private:
+    vector <int> identity_compress(vector <int> data);
+    vector <int> identity_decompress(vector <int> data);
+    
 public:
     vector <int> compress(vector <int> data) {
-        return data;
+        return identity_compress(data);
     }
-    vector <int> decompress(vector <int> data) {
-        return data;
+    vector <int> decompress(vector <int> compressed) {
+        return identity_decompress(compressed);
     }
 
     int init() {}
 };
 
 
-
-
+vector<int> DATCompression::identity_compress(vector<int> data) {
+    vector<int> compressed;
+    compressed.push_back(data[0]);
+    compressed.push_back(data[1]);
+    compressed.push_back(data[2]);
+    
+    vector<int>::iterator viter = data.begin();
+    viter++;
+    viter++;
+    viter++;
+    for (viter; viter != data.end(); ++viter) {
+        int val = *viter;
+        
+        compressed.push_back(val / 256);
+        compressed.push_back(val % 256);
+    }
+    
+    return compressed;
+}
+vector<int> DATCompression::identity_decompress(vector<int> compressed) {
+    vector<int> decompressed;
+    decompressed.push_back(compressed[0]);
+    decompressed.push_back(compressed[1]);
+    decompressed.push_back(compressed[2]);
+    
+    vector<int>::iterator viter = compressed.begin();
+    viter++;
+    viter++;
+    viter++;
+    for (viter; viter != compressed.end(); ++viter) {
+        int val = *viter;
+        val = 256 * val + *(++viter);
+        
+        decompressed.push_back(val);
+    }
+    
+    return decompressed;
+}
 
 
 
@@ -104,8 +144,8 @@ int main() {
         }
     }
     
-    cout << "Correctly recovered the original " << data.size() << " elements of the data" << endl;
-    cout << "TopCoder Compression ratio is " << 2 * data.size() / (float) compressed.size() << endl;
+    printf("Correctly recovered the original %ld elements of the data\n", data.size());
+    printf("TopCoder Compression ratio is %f\n", 2 * data.size() / (float) compressed.size());
     
     return 0;
 }
