@@ -4,6 +4,7 @@
 #include <fstream>
 #include <string>
 #include <cmath>
+#include <cstdlib>
 
 #define PH_MAX 16383
 
@@ -16,11 +17,14 @@ private:
     
     vector <int> diff_compress(vector <int> data);
     vector <int> diff_decompress(vector <int> data);
+
+    vector <int> frame_diff_compress(vector <int> data);
+    vector <int> frame_diff_decompress(vector <int> data);
     
     vector <int> compute_diffs(vector <int> data);
 public:
-    vector <int> compress(vector <int> data) { return diff_compress(data); }
-    vector <int> decompress(vector <int> compressed) { return diff_decompress(compressed); }
+    vector <int> compress(vector <int> data) { return frame_diff_compress(data); }
+    vector <int> decompress(vector <int> compressed) { return frame_diff_decompress(compressed); }
 
     int init() {}
 };
@@ -65,6 +69,78 @@ vector<int> DATCompression::identity_decompress(vector<int> compressed) {
     return decompressed;
 }
 
+vector<int> DATCompression::frame_diff_decompress(vector<int> compressed)
+{
+  vector<int> decompressed;
+  int x = compressed[0], y = compressed[1], l = compressed[2], q, r;
+
+  decompressed.push_back(x);
+  decompressed.push_back(y);
+  decompressed.push_back(l);
+
+  for(int x_ind = 0; x_ind < x; x_ind++)
+    for(int y_ind = 0; y_ind < y; y_ind++)
+    {
+      q = compressed[3 + 2 * (x_ind * y + y_ind)];
+      r = compressed[3 + 2 * (x_ind * y + y_ind) + 1];
+      decompressed.push_back(q * 256 + r);
+    }
+
+  return decompressed;
+}
+
+vector<int> DATCompression::frame_diff_compress(vector<int> data)
+{
+  vector<int> compressed;
+  double total;
+  int x = data[0], y = data[1], l = data[2], d;
+
+  compressed.push_back(x);
+  compressed.push_back(y);
+  compressed.push_back(l);
+
+  // for the first frame, l_ind = 0
+  for(int x_ind = 0; x_ind < x; x_ind++)
+    for(int y_ind = 0; y_ind < y; y_ind++)
+    {
+      compressed.push_back(data[3 + l * (x_ind * y + y_ind)] / 256);
+      compressed.push_back(data[3 + l * (x_ind * y + y_ind)] % 256);
+    }
+
+  // for the following frames
+  for(int l_ind = 0; l_ind < l - 1; l_ind++)
+  {
+    // calculate the different between the l_ind frame and (l_ind + 1) frame
+    total = 0.0;
+    for(int x_ind = 0; x_ind < x; x_ind++)
+      for(int y_ind = 0; y_ind < y; y_ind++)
+        total += data[3 + l * (x_ind * y + y_ind) + l_ind] - data[3 + l * (x_ind * y + y_ind) + l_ind + 1];
+    total /= (x * y);
+    total = floor(total + 0.5 + 1e-8);
+
+    if(total < 0)
+      compressed.push_back(-2 * total);
+    else if(total > 0)
+      compressed.push_back(2 * total - 1);
+    else if(!total)
+      compressed.push_back(0);
+    cout << total << " ";
+    for(int x_ind = 0; x_ind < x; x_ind++)
+      for(int y_ind = 0; y_ind < y; y_ind++)
+      {
+        d = data[3 + l * (x_ind * y + y_ind) + l_ind] - data[3 + l * (x_ind * y + y_ind) + l_ind + 1] - total;
+        if(d < 0)
+          d = -2 * d;
+        else if(d > 0)
+          d = 2 * d - 1;
+        compressed.push_back(d);
+        cout << d << " ";
+      }
+    cout << endl;
+  }
+
+  return compressed;
+}
 
 vector<int> DATCompression::diff_compress(vector<int> data) {
     vector<int> compressed;
@@ -268,9 +344,9 @@ int main() {
     
     // vector<int> data(110*110*75);
     test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
-    test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
-    test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
-    test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
+    //test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
+    //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
+    //test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
     
     return 0;
 }
