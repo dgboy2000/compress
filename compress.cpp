@@ -102,7 +102,7 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
     if(data[i] < 0 || data[i] >= HUFFMAN_MAX * HUFFMAN_MAX)
     {
       cout << "Error: huffman_compress do not accept data out of range [0..255]" << endl;
-      //exit(0);
+      exit(0);
     }
     freq[data[i] / HUFFMAN_MAX]++;
     freq[data[i] % HUFFMAN_MAX]++;
