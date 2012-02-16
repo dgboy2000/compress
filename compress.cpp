@@ -35,6 +35,9 @@ private:
     
     vector <int> encode_positive(vector <int> nonpositive);
     vector <int> decode_positive(vector <int> positive);
+    
+    vector <int> burrows_wheeler_encode(vector <int> data);
+    vector <int> burrows_wheeler_decode(vector <int> data);
 public:
     vector <int> compress(vector <int> data) { return golomb_compress(data); }
     vector <int> decompress(vector <int> compressed) { return golomb_decompress(compressed); }
@@ -416,6 +419,12 @@ vector<int> DATCompression::decode_positive(vector<int> positive) {
     return nonpositive;
 }
 
+// Computes the BWT of the specified data. The returned vector contains as it's first element
+// the 0-based index in the BWT matrix of the first row that contains the original string
+vector<int> DATCompression::burrows_wheeler_encode(vector<int> nonpositive) {
+    
+}
+
 
 vector<int> DATCompression::compute_diff_statistics(vector<int> data) {
     vector<int> diffs = compute_diffs(data);
@@ -436,7 +445,137 @@ vector<int> DATCompression::compute_diff_statistics(vector<int> data) {
 }
 
 
+class SuffixArray {
+    inline bool leq(int a1, int a2, int b1, int b2) // lexicographic order
+        {return(a1 < b1 || a1 == b1 && a2 <= b2); } // for pairs
+    inline bool leq(int a1, int a2, int a3, int b1, int b2, int b3)
+        {return(a1 < b1 || a1 == b1 && leq(a2,a3, b2,b3)); } // and triples
+    
+    // stably sort a[0..n-1] to b[0..n-1] with keys in 0..K from r
+    void radixPass(int* a, int* b, int* r, int n, int K);
+    
+    // find the suffix array SA of s[0..n-1] in {1..K}ˆn
+    // require s[n]=s[n+1]=s[n+2]=0, n>=2
+    void doSuffixArrayComputation(int* s, int* SA, int n, int K);
+    
+    void prepareSuffixArray();
+    
+    int n;
+    int *sa, *s;
+public:
+    SuffixArray(vector<int> data);
+    SuffixArray(int *data, int n);
+    ~SuffixArray() { free(sa); free(s); }
+    
+    int *getSuffixArray();
+};
 
+SuffixArray::SuffixArray(vector<int> data) {
+    n = data.size();
+    
+    s = (int *) calloc(n + 3, sizeof(int));
+    int *cur_data_elt = s;
+    
+    vector<int>::iterator data_end = data.end();
+    for (vector<int>::iterator viter=data.begin(); viter!=data_end; ++viter) {
+        *cur_data_elt = *viter;
+        ++cur_data_elt;
+    }
+    
+    prepareSuffixArray();
+}
+
+SuffixArray::SuffixArray(int *data, int _n) {
+    n = _n;
+    
+    s = (int *) calloc(n + 3, sizeof(int));
+    memcpy(s, data, n);
+    
+    prepareSuffixArray();
+}
+
+void SuffixArray::prepareSuffixArray() {
+    // Add 3 trailing zeroes for skew algorithm
+    int *cur_data_elt = s + (sizeof(int)) * n;
+    *cur_data_elt = 0; ++cur_data_elt;
+    *cur_data_elt = 0; ++cur_data_elt;
+    *cur_data_elt = 0; ++cur_data_elt;
+    
+    sa = (int *) calloc(n, sizeof(int));
+    doSuffixArrayComputation(s, sa, n, 16);
+}
+
+int * SuffixArray::getSuffixArray() {
+    return sa;
+}
+
+
+
+// stably sort a[0..n-1] to b[0..n-1] with keys in 0..K from r
+void SuffixArray::radixPass(int* a, int* b, int* r, int n, int K)
+{// count occurrences
+    int* c = new int[K + 1]; // counter array
+    for (int i = 0; i <= K; i++) c[i] = 0; // reset counters
+    for (int i = 0; i < n; i++) c[r[a[i]]]++; // count occurrences
+    for (int i = 0, sum = 0; i <= K; i++) // exclusive prefix sums
+    {int t = c[i]; c[i] = sum; sum += t; }
+    for (int i = 0; i < n; i++) b[c[r[a[i]]]++] = a[i]; // sort
+    delete [] c;
+}
+
+// find the suffix array SA of s[0..n-1] in {1..K}ˆn
+// require s[n]=s[n+1]=s[n+2]=0, n>=2
+void SuffixArray::doSuffixArrayComputation(int* s, int* SA, int n, int K) {
+    int n0=(n+2)/3, n1=(n+1)/3, n2=n/3, n02=n0+n2;
+    int* s12 = new int[n02 + 3]; s12[n02]= s12[n02+1]= s12[n02+2]=0;
+    int* SA12 = new int[n02 + 3]; SA12[n02]=SA12[n02+1]=SA12[n02+2]=0;
+    int* s0 = new int[n0];
+    int* SA0 = new int[n0];
+// generate positions of mod 1 and mod 2 suffixes
+// the "+(n0-n1)" adds a dummy mod 1 suffix if n%3 == 1
+    for (int i=0, j=0; i < n+(n0-n1); i++) if (i%3 != 0) s12[j++] = i;
+// lsb radix sort the mod 1 and mod 2 triples
+    radixPass(s12 , SA12, s+2, n02, K);
+    radixPass(SA12, s12 , s+1, n02, K);
+    radixPass(s12 , SA12, s , n02, K);
+// find lexicographic names of triples
+    int name = 0, c0 = -1, c1 = -1, c2 = -1;
+    for (int i = 0; i < n02; i++) {
+        if (s[SA12[i]] != c0 || s[SA12[i]+1] != c1 || s[SA12[i]+2] != c2)
+            {name++; c0 = s[SA12[i]]; c1 = s[SA12[i]+1]; c2 = s[SA12[i]+2]; }
+        if (SA12[i] % 3 == 1) { s12[SA12[i]/3] = name; } // left half
+        else {s12[SA12[i]/3 + n0] = name; } // right half
+    }
+// recurse if names are not yet unique
+    if (name < n02) {
+        doSuffixArrayComputation(s12, SA12, n02, name);
+// store unique names in s12 using the suffix array
+        for (int i = 0; i < n02; i++) s12[SA12[i]] = i + 1;
+    } else // generate the suffix array of s12 directly
+        for (int i = 0; i < n02; i++) SA12[s12[i] - 1] = i;
+// stably sort the mod 0 suffixes from SA12 by their first character
+    for (int i=0, j=0; i < n02; i++) if (SA12[i] < n0) s0[j++] = 3*SA12[i];
+    radixPass(s0, SA0, s, n0, K);
+// merge sorted SA0 suffixes and sorted SA12 suffixes
+    for (int p=0, t=n0-n1, k=0; k < n; k++) {
+#define GetI() (SA12[t] < n0 ? SA12[t] * 3 + 1 : (SA12[t] - n0) * 3 + 2)
+        int i = GetI(); // pos of current offset 12 suffix
+        int j = SA0[p]; // pos of current offset 0 suffix
+        if (SA12[t] < n0 ? // different compares for mod 1 and mod 2 suffixes
+            leq(s[i], s12[SA12[t] + n0], s[j], s12[j/3]) :
+            leq(s[i],s[i+1],s12[SA12[t]-n0+1], s[j],s[j+1],s12[j/3+n0]))
+        {// suffix from SA12 is smaller
+            SA[k] = i; t++;
+            if (t == n02) // done --- only SA0 suffixes left
+                for (k++; p < n0; p++, k++) SA[k] = SA0[p];
+        } else {// suffix from SA0 is smaller
+            SA[k] = j; p++;
+            if (p == n0) // done --- only SA12 suffixes left
+                for (k++; t < n02; t++, k++) SA[k] = GetI();
+        }
+    }
+    delete [] s12; delete [] SA12; delete [] SA0; delete [] s0;
+}
 
 
 
@@ -444,6 +583,20 @@ vector<int> DATCompression::compute_diff_statistics(vector<int> data) {
 
 
 /*********** Testing Utilities ***************/
+
+void test_suffix_arrays() {
+    int len = 9;
+    int word[] = {1, 2, 3, 4, 5, 4, 3, 2, 1};
+    int true_suffixes[] = {8, 0, 7, 1, 6, 2, 5, 3, 4};
+    
+    SuffixArray sa(word, len);
+    int *suffixes = sa.getSuffixArray();
+    
+    for (int i=0; i<len; ++i) {
+        if (suffixes[i] == true_suffixes[i]) printf("CORRECT: True suffix SA[%d] = %d\n", i, suffixes[i]);
+        else printf("ERROR: True suffix SA[%d] is %d but found %d\n", i, true_suffixes[i], suffixes[i]);
+    }
+}
 
 vector<int> read_data(string filename) {
     ifstream data_file;
@@ -549,9 +702,11 @@ int main() {
     
     dat->init();
     
+    test_suffix_arrays();
+    
     //investigate_file("data/B28-39_100_100_acq_0007.tab");
     
-    test_compression_on_file("data/test.tab");
+    // test_compression_on_file("data/test.tab");
 
     //test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     //test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
