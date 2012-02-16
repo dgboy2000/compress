@@ -22,8 +22,8 @@ private:
     vector <int> golomb_compress(vector <int> data);
     vector <int> golomb_decompress(vector <int> data);
 
-    //vector <int> huffman_compress(vector <int> data);
-    //vector <int> huffman_compress(vector <int> data);
+    vector <int> huffman_compress(vector <int> data);
+    vector <int> huffman_decompress(vector <int> data);
     
     vector <int> diff_compress(vector <int> data);
     vector <int> diff_decompress(vector <int> data);
@@ -39,7 +39,7 @@ public:
     vector <int> compute_diff_statistics(vector <int> data);
 
     int init() {
-        golomb_n = 8;
+        golomb_n = 4;
     }
 };
 
@@ -83,6 +83,21 @@ vector<int> DATCompression::identity_decompress(vector<int> compressed) {
     return decompressed;
 }
 
+vector<int> DATCompression::huffman_compress(vector<int> data)
+{
+  vector<int> compressed;
+  
+
+  return compressed;
+}
+
+vector<int> DATCompression::huffman_decompress(vector<int> compressed)
+{
+  vector<int> decompressed;
+
+  return decompressed;
+}
+
 vector<int> DATCompression::golomb_compress(vector<int> data)
 {
   vector<int> compressed;
@@ -98,7 +113,8 @@ vector<int> DATCompression::golomb_compress(vector<int> data)
     q = data[i] / golomb_n, r = data[i] % golomb_n;
     for(int j = 0; j < q; j++)
     {
-      temp = temp * 2 + 1;
+      temp <<= 1;
+      temp |= 0x1;
       t++;
       if(t >= 8)
       {
@@ -106,7 +122,7 @@ vector<int> DATCompression::golomb_compress(vector<int> data)
         temp = 0, t = 0;
       }
     }
-    temp *= 2;
+    temp <<= 1;
     t++;
     if(t >= 8)
     {
@@ -115,9 +131,9 @@ vector<int> DATCompression::golomb_compress(vector<int> data)
     }
     for(int j = 0; j < int(log(golomb_n) / log(2.0) + 1e-8); j++)
     {
-      temp *= 2;
+      temp <<= 1;
       if(r % 2)
-        temp++;
+        temp |= 0x1;
       t++;
       if(t >= 8)
       {
@@ -131,7 +147,10 @@ vector<int> DATCompression::golomb_compress(vector<int> data)
   if(t)
   {
     for(int i = 0; i < 8 - t; i++)
-      temp = temp * 2 + 1;
+    {
+      temp <<= 1;
+      temp |= 0x1;
+    }
     compressed.push_back(temp);
   }
 
@@ -168,7 +187,7 @@ vector<int> DATCompression::golomb_decompress(vector<int> compressed)
           q = 0;
         }
       }
-      temp *= 2;
+      temp <<= 1;
     }
   }
 
