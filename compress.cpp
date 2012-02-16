@@ -1,10 +1,11 @@
-#include <iostream>
-#include <vector>
-#include <sstream>
-#include <fstream>
-#include <string>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #define PH_MAX 16383
 
@@ -21,8 +22,8 @@ private:
     vector <int> golomb_compress(vector <int> data);
     vector <int> golomb_decompress(vector <int> data);
 
-    vector <int> huffman_compress(vector <int> data);
-    vector <int> huffman_compress(vector <int> data);
+    //vector <int> huffman_compress(vector <int> data);
+    //vector <int> huffman_compress(vector <int> data);
     
     vector <int> diff_compress(vector <int> data);
     vector <int> diff_decompress(vector <int> data);
@@ -30,10 +31,12 @@ private:
     vector <int> frame_diff_compress(vector <int> data);
     vector <int> frame_diff_decompress(vector <int> data);
     
-    vector <int> compute_diffs(vector <int> data);
+    vector <int> compute_diffs(vector <int> data);  
 public:
     vector <int> compress(vector <int> data) { return golomb_compress(data); }
     vector <int> decompress(vector <int> compressed) { return golomb_decompress(compressed); }
+
+    vector <int> compute_diff_statistics(vector <int> data);
 
     int init() {
         golomb_n = 8;
@@ -338,9 +341,52 @@ vector<int> DATCompression::diff_decompress(vector<int> compressed) {
 
 
 /*********** Compression Utilities ***************/
-// vector<int> DATCompression::compute_diffs(vector<int> data) {
-//     vector<
-// }
+vector<int> DATCompression::compute_diffs(vector<int> data) {
+    vector<int> diffs;
+    
+    int x = data[0];
+    int y = data[1];
+    int L = data[2];
+    
+    vector<int>::iterator viter = data.begin();
+    viter++;
+    viter++;
+    viter++;
+    
+    for (int x_ind=0; x_ind < x; ++x_ind) {
+        for (int y_ind=0; y_ind < y; ++y_ind) {
+            int val = data[3 + L * (x_ind*y + y_ind)];
+                        
+            for (int L_ind=1; L_ind < L; ++L_ind) {
+                int diff = data[3 + L * (x_ind*y + y_ind) + L_ind] - val;
+                val = diff + val;
+                diffs.push_back(diff);
+            }
+        }
+    }
+    
+    return diffs;
+}
+
+
+vector<int> DATCompression::compute_diff_statistics(vector<int> data) {
+    vector<int> diffs = compute_diffs(data);
+    map<int, int> diff_counts;
+
+    for (vector<int>::iterator viter = diffs.begin(); viter < diffs.end(); ++viter) {
+        int val = *viter;
+        if (diff_counts.count(val) == 0) diff_counts[val] = 0;
+        ++diff_counts[val];
+    }
+    
+    cout << "Counts of each difference in the data:" << endl;
+    for (map<int, int>::iterator miter = diff_counts.begin(); miter != diff_counts.end(); ++miter) {
+        printf("%d: %d\n", (*miter).first, (*miter).second);
+    }
+    
+    return diffs;
+}
+
 
 
 
@@ -440,13 +486,25 @@ void test_compression_on_file(string filename) {
     printf("TopCoder Compression ratio is %f\n", 2 * data.size() / (float) compressed.size());
 }
 
+void investigate_file(string filename) {
+    DATCompression dat;
+    dat.init();
+    
+    printf("Investigating file %s\n", filename.c_str());
+    
+    vector<int> data = read_data(filename);
+    dat.compute_diff_statistics(data);
+}
+
 int main() {
     DATCompression *dat = new DATCompression();
     
     dat->init();
     
-    // vector<int> data(110*110*75);
+    //investigate_file("data/B28-39_100_100_acq_0007.tab");
+    
     test_compression_on_file("data/test.tab");
+
     //test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     //test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
