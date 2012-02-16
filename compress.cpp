@@ -31,7 +31,10 @@ private:
     vector <int> frame_diff_compress(vector <int> data);
     vector <int> frame_diff_decompress(vector <int> data);
     
-    vector <int> compute_diffs(vector <int> data);  
+    vector <int> compute_diffs(vector <int> data);
+    
+    vector <int> encode_positive(vector <int> nonpositive);
+    vector <int> decode_positive(vector <int> positive);
 public:
     vector <int> compress(vector <int> data) { return golomb_compress(data); }
     vector <int> decompress(vector <int> compressed) { return golomb_decompress(compressed); }
@@ -366,6 +369,32 @@ vector<int> DATCompression::compute_diffs(vector<int> data) {
     }
     
     return diffs;
+}
+
+
+vector<int> DATCompression::encode_positive(vector<int> nonpositive) {
+    vector<int> positive;
+    positive.reserve(nonpositive.size());
+    
+    for (vector<int>::iterator viter = nonpositive.begin(); viter != nonpositive.end(); ++viter) {
+        int val = *viter;
+        if (val == 0) positive.push_back(0);
+        else if (val > 0) positive.push_back(2*val - 1);
+        else positive.push_back(-2*val);
+    }
+    return positive;
+}
+
+vector<int> DATCompression::decode_positive(vector<int> positive) {
+    vector<int> nonpositive;
+    nonpositive.reserve(positive.size());
+    
+    for (vector<int>::iterator viter = positive.begin(); viter != positive.end(); ++viter) {
+        int val = *viter;
+        if (val % 2 == 1) nonpositive.push_back((val+1) / 2);
+        else nonpositive.push_back(-val/2);
+    }
+    return nonpositive;
 }
 
 
