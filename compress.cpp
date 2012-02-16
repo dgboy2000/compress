@@ -467,8 +467,19 @@ public:
     SuffixArray(int *data, int n);
     ~SuffixArray() { free(sa); free(s); }
     
+    void print();
+    
     int *getSuffixArray();
 };
+
+void SuffixArray::print() {
+    for (int i=0; i<(n+3); ++i) {
+        printf("s[%d] = %d\n", i, s[i]);
+    }
+    for (int i=0; i<n; ++i) {
+        printf("sa[%d] = %d\n", i, sa[i]);
+    }
+}
 
 SuffixArray::SuffixArray(vector<int> data) {
     n = data.size();
@@ -489,7 +500,7 @@ SuffixArray::SuffixArray(int *data, int _n) {
     n = _n;
     
     s = (int *) calloc(n + 3, sizeof(int));
-    memcpy(s, data, n);
+    memcpy(s, data, n * (sizeof(int)));
     
     prepareSuffixArray();
 }
@@ -590,7 +601,9 @@ void test_suffix_arrays() {
     int true_suffixes[] = {8, 0, 7, 1, 6, 2, 5, 3, 4};
     
     SuffixArray sa(word, len);
+    sa.print();
     int *suffixes = sa.getSuffixArray();
+    
     
     for (int i=0; i<len; ++i) {
         if (suffixes[i] == true_suffixes[i]) printf("CORRECT: True suffix SA[%d] = %d\n", i, suffixes[i]);
