@@ -12,7 +12,7 @@ using namespace std;
 
 class DATCompression {
 private:
-    int golomb_n;
+    int golomb_n; // par for golomb encoding, power of 2
 
     vector <int> identity_compress(vector <int> data);
     vector <int> identity_decompress(vector <int> data);
@@ -20,6 +20,9 @@ private:
     // golomb encoding suitable for the case that the majority of data are small nonnegative numbers
     vector <int> golomb_compress(vector <int> data);
     vector <int> golomb_decompress(vector <int> data);
+
+    vector <int> huffman_compress(vector <int> data);
+    vector <int> huffman_compress(vector <int> data);
     
     vector <int> diff_compress(vector <int> data);
     vector <int> diff_decompress(vector <int> data);
@@ -32,7 +35,9 @@ public:
     vector <int> compress(vector <int> data) { return golomb_compress(data); }
     vector <int> decompress(vector <int> compressed) { return golomb_decompress(compressed); }
 
-    int init() {golomb_n = 4;}
+    int init() {
+        golomb_n = 8;
+    }
 };
 
 
@@ -82,6 +87,11 @@ vector<int> DATCompression::golomb_compress(vector<int> data)
 
   for(int i = 0; i < data.size(); i++)
   {
+    if(data[i] < 0)
+    {
+      cout << "Error: golomb_compress do not accept negative data" << endl;
+      exit(0);
+    }
     q = data[i] / golomb_n, r = data[i] % golomb_n;
     for(int j = 0; j < q; j++)
     {
@@ -100,23 +110,18 @@ vector<int> DATCompression::golomb_compress(vector<int> data)
       compressed.push_back(temp);
       temp = 0, t = 0;
     }
-    temp *= 2;
-    if(r / 2)
-      temp++;
-    t++;
-    if(t >= 8)
+    for(int j = 0; j < int(log(golomb_n) / log(2.0) + 1e-8); j++)
     {
-      compressed.push_back(temp);
-      temp = 0, t = 0;
-    }
-    temp *= 2;
-    if(r % 2)
-      temp++;
-    t++;
-    if(t >= 8)
-    {
-      compressed.push_back(temp);
-      temp = 0, t = 0;
+      temp *= 2;
+      if(r % 2)
+        temp++;
+      t++;
+      if(t >= 8)
+      {
+        compressed.push_back(temp);
+        temp = 0, t = 0;
+      }
+      r /= 2;
     }
   }
   
@@ -133,7 +138,7 @@ vector<int> DATCompression::golomb_compress(vector<int> data)
 vector<int> DATCompression::golomb_decompress(vector<int> compressed)
 {
   vector<int> decompressed;
-  int temp, q = 0, r = 0, nr = 0;
+  int temp, q = 0, r = 0, power = 1, nr = 0;
   char status = 'q';
 
   for(int i = 0; i < compressed.size(); i++)
@@ -146,16 +151,14 @@ vector<int> DATCompression::golomb_decompress(vector<int> compressed)
         if((temp & 0x80) == 0x80)
           q++;
         else
-          status = 'r', r = 0, nr = 0;
+          status = 'r', r = 0, power = 1, nr = 0;
       }
       else
       {
         if((temp & 0x80) == 0x80)
-          r = r * 2 + 1;
-        else
-          r *= 2;
-        nr++;
-        if(nr == 2)
+          r += power;
+        nr++, power *= 2;
+        if(nr == int(log(golomb_n) / log(2.0) + 1e-8))
         {
           status = 'q';
           decompressed.push_back(q * golomb_n + r);
@@ -443,8 +446,8 @@ int main() {
     dat->init();
     
     // vector<int> data(110*110*75);
-    //test_compression_on_file("data/test.tab");
-    test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
+    test_compression_on_file("data/test.tab");
+    //test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     //test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
