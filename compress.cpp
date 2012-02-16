@@ -4,12 +4,14 @@
 #include <iostream>
 #include <map>
 #include <sstream>
-#include <string>
+#include <cstring>
 #include <vector>
 
 #define PH_MAX 16383
+#define HUFFMAN_MAX 16
 
 using namespace std;
+
 
 class DATCompression {
 private:
@@ -22,6 +24,7 @@ private:
     vector <int> golomb_compress(vector <int> data);
     vector <int> golomb_decompress(vector <int> data);
 
+    // the input data of huffman encoding must be in range of [0..255]
     vector <int> huffman_compress(vector <int> data);
     vector <int> huffman_decompress(vector <int> data);
     
@@ -39,8 +42,8 @@ private:
     vector <int> burrows_wheeler_encode(vector <int> data);
     vector <int> burrows_wheeler_decode(vector <int> data);
 public:
-    vector <int> compress(vector <int> data) { return golomb_compress(data); }
-    vector <int> decompress(vector <int> compressed) { return golomb_decompress(compressed); }
+    vector <int> compress(vector <int> data) { return huffman_compress(data); }
+    vector <int> decompress(vector <int> compressed) { return huffman_decompress(compressed); }
 
     vector <int> compute_diff_statistics(vector <int> data);
 
@@ -48,7 +51,6 @@ public:
         golomb_n = 4;
     }
 };
-
 
 vector<int> DATCompression::identity_compress(vector<int> data) {
     vector<int> compressed;
@@ -92,7 +94,122 @@ vector<int> DATCompression::identity_decompress(vector<int> compressed) {
 vector<int> DATCompression::huffman_compress(vector<int> data)
 {
   vector<int> compressed;
+  int freq[HUFFMAN_MAX], in_set[HUFFMAN_MAX], masked[HUFFMAN_MAX];
+  int max_freq, second_max_freq, max_ind, second_max_ind, s, temp = 0, code_size, t = 0, q, r;
+  vector<int> code[HUFFMAN_MAX];
   
+  memset(freq, 0, sizeof(freq));
+  memset(masked, 0, sizeof(masked));
+  for(int i = 0; i < data.size(); i++)
+  {
+    if(data[i] < 0 || data[i] >= HUFFMAN_MAX * HUFFMAN_MAX)
+    {
+      cout << "Error: huffman_compress do not accept data out of range [0..255]" << endl;
+      exit(0);
+    }
+    freq[data[i] / HUFFMAN_MAX]++;
+    freq[data[i] % HUFFMAN_MAX]++;
+  }
+
+  for(int i = 0; i < HUFFMAN_MAX; i++)
+  {
+    code[i].clear();
+    in_set[i] = i;
+  }
+
+  for(int i = 0; i < HUFFMAN_MAX - 1; i++)
+  {
+    // find out the minimum and second miniimum freq
+    max_freq = -1, second_max_freq = -1;
+    for(int j = 0; j < HUFFMAN_MAX; j++)
+      if(!masked[j])
+      {
+        if(freq[j] < max_freq || max_freq == -1)
+          second_max_freq = max_freq, second_max_ind = max_ind, max_freq = freq[j], max_ind = j;
+        else if(freq[j] < second_max_freq || second_max_freq == -1)
+          second_max_freq = freq[j], second_max_ind = j;
+      }
+
+    // merge them
+    freq[max_ind] += freq[second_max_ind];
+    masked[second_max_ind] = 1;
+
+    for(int j = 0; j < HUFFMAN_MAX; j++)
+    {
+      if(in_set[j] == in_set[second_max_ind])
+        code[j].push_back(1);
+      else if(in_set[j] == in_set[max_ind])
+        code[j].push_back(0);
+    }
+    
+    s = in_set[second_max_ind];
+    for(int j = 0; j < HUFFMAN_MAX; j++)
+      if(in_set[j] == s)
+        in_set[j] = in_set[max_ind];
+    in_set[second_max_ind] = in_set[max_ind];
+
+  }
+
+  for(int i = 0; i < HUFFMAN_MAX; i++)
+  {
+    code_size = code[i].size();
+    for(int j = 0; j < 4; j++)
+    {
+      temp = temp * 2 + (code_size % 2);
+      code_size /= 2, t++;
+      if(t == 8)
+      {
+        compressed.push_back(temp);
+        temp = 0, t = 0;
+      }
+    }
+
+    for(int j = code[i].size() - 1; j >= 0; j--)
+    {
+      temp = temp * 2 + code[i][j], t++;
+      if(t == 8)
+      {
+        compressed.push_back(temp);
+        temp = 0, t = 0;
+      }
+    }
+  }
+
+  for(int i = 0; i < data.size(); i++)
+  {
+    q = data[i] / HUFFMAN_MAX;
+    r = data[i] % HUFFMAN_MAX;
+    for(int j = code[q].size() - 1; j >= 0; j--)
+    {
+      temp = temp * 2 + code[q][j], t++;
+      if(t == 8)
+      {
+        compressed.push_back(temp);
+        temp = 0, t = 0;
+      }
+    }
+    for(int j = code[r].size() - 1; j >= 0; j--)
+    {
+      temp = temp * 2 + code[r][j], t++;
+      if(t == 8)
+      {
+        compressed.push_back(temp);
+        temp = 0, t = 0;
+      }
+    }
+  }
+
+  if(t)
+  {
+    for(int i = 0; i < 8 - t; i++)
+      temp = temp * 2;
+    compressed.push_back(temp);
+  }
+
+  if(!t)
+    compressed.push_back(0);
+  else
+    compressed.push_back(8 - t);
 
   return compressed;
 }
@@ -100,6 +217,71 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
 vector<int> DATCompression::huffman_decompress(vector<int> compressed)
 {
   vector<int> decompressed;
+  vector<int> code[HUFFMAN_MAX];
+  int code_pointer[HUFFMAN_MAX];
+  int number, d = 0, power = 1, code_ind = 0, c, temp = 0, t = 0, cur_bit, q, r, g = 0;
+  int useless_bits = compressed[compressed.size() - 1];
+  char status = 'd';
+
+  memset(code_pointer, 0, sizeof(code_pointer));
+  for(int i = 0; i < compressed.size() - 1; i++)
+  {
+    number = compressed[i];
+    for(int j = 0; j < 8; j++)
+    {
+      if(status == 'd')
+      {
+        if((number & 0x80) == 0x80)
+          temp += power;
+        number <<= 1;
+        power *= 2, d++;
+        if(d == 4)
+          status = 'c', c = temp;
+      }
+      else if(status == 'c')
+      {
+        if((number & 0x80) == 0x80)
+          code[code_ind].push_back(1);
+        else
+          code[code_ind].push_back(0);
+        number <<= 1;
+        c--;
+        if(!c)
+          status = 'd', code_ind++, d = 0, power = 1, temp = 0;
+        if(code_ind == HUFFMAN_MAX)
+          status = 't';
+      }
+      else if(status == 't')
+      {
+        if(i == compressed.size() - 2 && 8 - i == useless_bits)
+          break;
+
+        if((number & 0x80) == 0x80)
+          cur_bit = 1;
+        else
+          cur_bit = 0;
+        number <<= 1;
+        for(int k = 0; k < HUFFMAN_MAX; k++)
+          if(!code_pointer[k])
+            if(code[k][t] == cur_bit && t == code[k].size() - 1)
+            {
+              t = -1;
+              memset(code_pointer, 0, sizeof(code_pointer));
+              if(!g)
+                q = k, g = 1;
+              else
+              {
+                r = k, g = 0;
+                decompressed.push_back(q * HUFFMAN_MAX + r);
+              }
+              break;
+            }
+            else if(code[k][t] != cur_bit)
+              code_pointer[k] = 1;
+        t++;
+      }
+    }
+  }
 
   return decompressed;
 }
