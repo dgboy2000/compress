@@ -134,11 +134,8 @@ vector <int> DATCompression::compression(vector<int> data)
   vector <int> compressed;
   int max_data, min_data;
   
-  cout << data.size() << endl;
   compressed = diff_compress(data);
-  cout << compressed.size() << endl;
   compressed = huffman_compress(compressed);
-  cout << compressed.size() << endl;
 
   return compressed;
 }
@@ -179,6 +176,7 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
     in_set[i] = i;
   }
 
+  // generate code dictionary
   for(int i = 0; i < HUFFMAN_MAX - 1; i++)
   {
     // find out the minimum and second minimum freq
@@ -217,7 +215,9 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
     code_size = code[i].size();
     for(int j = 0; j < 4; j++)
     {
-      temp = temp * 2 + (code_size % 2);
+      temp <<= 1;
+      if(code_size % 2)
+        temp |= 1;
       code_size /= 2, t++;
       if(t == 8)
       {
@@ -228,7 +228,10 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
 
     for(int j = code[i].size() - 1; j >= 0; j--)
     {
-      temp = temp * 2 + code[i][j], t++;
+      temp <<= 1;
+      if(code[i][j])
+        temp |= 1;
+      t++;
       if(t == 8)
       {
         compressed.push_back(temp);
@@ -254,7 +257,10 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
         q = data[i] % HUFFMAN_MAX;
       for(int j = code[q].size() - 1; j >= 0; j--)
       {
-        temp = temp * 2 + code[q][j], t++;
+        temp <<= 1;
+        if(code[q][j])
+          temp |= 1;
+        t++;
         if(t == 8)
         {
           compressed.push_back(temp);
@@ -267,7 +273,7 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
   if(t)
   {
     for(int i = 0; i < 8 - t; i++)
-      temp = temp * 2;
+      temp <<= 1;
     compressed.push_back(temp);
   }
 
@@ -283,12 +289,12 @@ vector<int> DATCompression::huffman_decompress(vector<int> compressed)
 {
   vector<int> decompressed;
   vector<int> code[HUFFMAN_MAX];
-  int code_pointer[HUFFMAN_MAX];
-  int number, d = 0, power = 1, code_ind = 0, c, temp = 0, t = 0, cur_bit, q, r, g = 0;
+  int code_space[65536], position;
+  int number, d = 0, power = 1, code_ind = 0, c, temp = 0, q, r, g = 0;
   int useless_bits = compressed[compressed.size() - 1];
   char status = 'd';
 
-  memset(code_pointer, 0, sizeof(code_pointer));
+  memset(code_space, -1, sizeof(code_space));
   for(int i = 0; i < compressed.size() - 1; i++)
   {
     number = compressed[i];
@@ -314,7 +320,23 @@ vector<int> DATCompression::huffman_decompress(vector<int> compressed)
         if(!c)
           status = 'd', code_ind++, d = 0, power = 1, temp = 0;
         if(code_ind == HUFFMAN_MAX)
+        {
           status = 't';
+          // generate code space
+          for(int k = 0; k < HUFFMAN_MAX; k++)
+          {
+            position = 0;
+            for(int l = 0; l < code[k].size(); l++)
+            {
+              if(!code[k][l])
+                position = position * 2 + 1;
+              else
+                position = position * 2 + 2;
+            }
+            code_space[position] = k;
+          }
+          position = 0;
+        }
       }
       else if(status == 't')
       {
@@ -322,28 +344,21 @@ vector<int> DATCompression::huffman_decompress(vector<int> compressed)
           break;
 
         if((number & 0x80) == 0x80)
-          cur_bit = 1;
+          position = position * 2 + 2;
         else
-          cur_bit = 0;
+          position = position * 2 + 1;
+        if(code_space[position] >= 0)
+        {
+          if(!g)
+            q = code_space[position], g = 1;
+          else
+          {
+            r = code_space[position], g = 0;
+            decompressed.push_back(q * HUFFMAN_MAX + r);
+          }
+          position = 0;
+        }
         number <<= 1;
-        for(int k = 0; k < HUFFMAN_MAX; k++)
-          if(!code_pointer[k])
-            if(code[k][t] == cur_bit && t == code[k].size() - 1)
-            {
-              t = -1;
-              memset(code_pointer, 0, sizeof(code_pointer));
-              if(g == 0)
-                q = k, g = 1;
-              else
-              {
-                r = k, g = 0;
-                decompressed.push_back(q * HUFFMAN_MAX + r);
-              }
-              break;
-            }
-            else if(code[k][t] != cur_bit)
-              code_pointer[k] = 1;
-        t++;
       }
     }
   }
