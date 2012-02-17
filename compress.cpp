@@ -141,7 +141,6 @@ vector<int> DATCompression::identity_decompress(vector<int> compressed) {
 vector <int> DATCompression::compression(vector<int> data)
 {
   vector <int> compressed;
-  int max_data, min_data;
   
   compressed = diff_compress(data);
   compressed = huffman_compress(compressed);
@@ -349,7 +348,7 @@ vector<int> DATCompression::huffman_decompress(vector<int> compressed)
       }
       else if(status == 't')
       {
-        if(i == compressed.size() - 2 && 8 - i == useless_bits)
+        if(i == compressed.size() - 2 && 8 - j == useless_bits)
           break;
 
         if((number & 0x80) == 0x80)
@@ -1105,7 +1104,7 @@ int main() {
     // test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     //test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
-    //test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
+    test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
     
     return 0;
 }
