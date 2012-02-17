@@ -17,12 +17,18 @@
 using namespace std;
 
 
+void test_compression_on_file(string filename);
+
+
 class DATCompression {
 private:
     int golomb_n; // par for golomb encoding, power of 2
 
     vector <int> identity_compress(vector <int> data);
     vector <int> identity_decompress(vector <int> data);
+
+    vector <int> compression(vector <int> data);
+    vector <int> decompression(vector <int> data);
 
     // golomb encoding suitable for the case that the majority of data are small nonnegative numbers
     vector <int> golomb_compress(vector <int> data);
@@ -43,11 +49,11 @@ private:
     vector <int> encode_positive(vector <int> nonpositive);
     vector <int> decode_positive(vector <int> positive);
 public:
-    vector <int> compress(vector <int> data) { return huffman_compress(data); }
-    vector <int> decompress(vector <int> compressed) { return huffman_decompress(compressed); }
-    
     int *burrows_wheeler_encode(int *data, int n);
     int *burrows_wheeler_decode(int *data, int n);
+
+    vector <int> compress(vector <int> data) { return compression(data); }
+    vector <int> decompress(vector <int> compressed) { return decompression(compressed); }
 
     vector <int> compute_diff_statistics(vector <int> data);
 
@@ -129,23 +135,50 @@ vector<int> DATCompression::identity_decompress(vector<int> compressed) {
     return decompressed;
 }
 
+vector <int> DATCompression::compression(vector<int> data)
+{
+  vector <int> compressed;
+  
+  //cout << data.size() << endl;
+  compressed = diff_compress(data);
+  //cout << compressed.size() << endl;
+  compressed = encode_positive(compressed);
+  //cout << compressed.size() << endl;
+  compressed = huffman_compress(compressed);
+  //cout << compressed.size() << endl;
+
+  return compressed;
+}
+
+vector <int> DATCompression::decompression(vector<int> compressed)
+{
+  vector <int> decompressed;
+
+  decompressed = huffman_decompress(compressed);
+  decompressed = decode_positive(decompressed);
+  decompressed = diff_decompress(decompressed);
+
+  return decompressed;
+}
+
 vector<int> DATCompression::huffman_compress(vector<int> data)
 {
   vector<int> compressed;
   int freq[HUFFMAN_MAX], in_set[HUFFMAN_MAX], masked[HUFFMAN_MAX];
-  int max_freq, second_max_freq, max_ind, second_max_ind, s, temp = 0, code_size, t = 0, q, r;
+  int max_freq, second_max_freq, max_ind, second_max_ind, s, temp = 0, code_size, t = 0, q;
   vector<int> code[HUFFMAN_MAX];
   
   memset(freq, 0, sizeof(freq));
   memset(masked, 0, sizeof(masked));
   for(int i = 0; i < data.size(); i++)
   {
-    if(data[i] < 0 || data[i] >= HUFFMAN_MAX * HUFFMAN_MAX)
+    if(data[i] < 0 || data[i] >= HUFFMAN_MAX * HUFFMAN_MAX * HUFFMAN_MAX)
     {
-      cout << "Error: huffman_compress do not accept data out of range [0..255]" << endl;
+      cout << "Error: huffman_compress do not accept data out of range [0..4096]" << endl;
       exit(0);
     }
-    freq[data[i] / HUFFMAN_MAX]++;
+    freq[data[i] / (HUFFMAN_MAX * HUFFMAN_MAX)]++;
+    freq[(data[i] % (HUFFMAN_MAX * HUFFMAN_MAX)) / HUFFMAN_MAX]++;
     freq[data[i] % HUFFMAN_MAX]++;
   }
 
@@ -157,7 +190,7 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
 
   for(int i = 0; i < HUFFMAN_MAX - 1; i++)
   {
-    // find out the minimum and second miniimum freq
+    // find out the minimum and second minimum freq
     max_freq = -1, second_max_freq = -1;
     for(int j = 0; j < HUFFMAN_MAX; j++)
       if(!masked[j])
@@ -213,26 +246,31 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
     }
   }
 
+  /*for(int i = 0; i < HUFFMAN_MAX; i++)
+  {
+    for(int j = code[i].size() - 1; j >= 0; j--)
+      cout << code[i][j] << " ";
+    cout << endl;
+  }*/
+
   for(int i = 0; i < data.size(); i++)
   {
-    q = data[i] / HUFFMAN_MAX;
-    r = data[i] % HUFFMAN_MAX;
-    for(int j = code[q].size() - 1; j >= 0; j--)
+    for(int k = 0; k < 3; k++)
     {
-      temp = temp * 2 + code[q][j], t++;
-      if(t == 8)
+      if(k == 0)
+        q = data[i] / (HUFFMAN_MAX * HUFFMAN_MAX);
+      else if(k == 1)
+        q = (data[i] % (HUFFMAN_MAX * HUFFMAN_MAX)) / HUFFMAN_MAX;
+      else if(k == 2)
+        q = data[i] % HUFFMAN_MAX;
+      for(int j = code[q].size() - 1; j >= 0; j--)
       {
-        compressed.push_back(temp);
-        temp = 0, t = 0;
-      }
-    }
-    for(int j = code[r].size() - 1; j >= 0; j--)
-    {
-      temp = temp * 2 + code[r][j], t++;
-      if(t == 8)
-      {
-        compressed.push_back(temp);
-        temp = 0, t = 0;
+        temp = temp * 2 + code[q][j], t++;
+        if(t == 8)
+        {
+          compressed.push_back(temp);
+          temp = 0, t = 0;
+        }
       }
     }
   }
@@ -257,7 +295,7 @@ vector<int> DATCompression::huffman_decompress(vector<int> compressed)
   vector<int> decompressed;
   vector<int> code[HUFFMAN_MAX];
   int code_pointer[HUFFMAN_MAX];
-  int number, d = 0, power = 1, code_ind = 0, c, temp = 0, t = 0, cur_bit, q, r, g = 0;
+  int number, d = 0, power = 1, code_ind = 0, c, temp = 0, t = 0, cur_bit, q, r, s, g = 0;
   int useless_bits = compressed[compressed.size() - 1];
   char status = 'd';
 
@@ -305,12 +343,14 @@ vector<int> DATCompression::huffman_decompress(vector<int> compressed)
             {
               t = -1;
               memset(code_pointer, 0, sizeof(code_pointer));
-              if(!g)
+              if(g == 0)
                 q = k, g = 1;
-              else
+              else if(g == 1)
+                r = k, g = 2;
+              else if(g == 2)
               {
-                r = k, g = 0;
-                decompressed.push_back(q * HUFFMAN_MAX + r);
+                s = k, g = 0;
+                decompressed.push_back(q * (HUFFMAN_MAX * HUFFMAN_MAX) + r * HUFFMAN_MAX + s);
               }
               break;
             }
@@ -671,23 +711,26 @@ bool pair_comparator(pair<int,int> a, pair<int,int> b) { return (a.first < b.fir
 int *DATCompression::burrows_wheeler_decode(int *data, int n) {
     int dollar_pos = data[n+1];
     int bwt_size = n + 1;
+
+
     
     pair<int,int> *f = (pair<int,int> *) calloc(bwt_size, sizeof(pair<int,int>));
     int *t = (int *) calloc(bwt_size, sizeof(int));
     int *s = (int *) calloc(n, sizeof(int));
     
     for (int i=0; i<bwt_size; ++i) f[i] = pair<int,int>(data[i], i);
-    sort(f, f + bwt_size * (sizeof(pair<int,int>)), pair_comparator);
+    sort(f, f + bwt_size, pair_comparator);
     
     for (int i=0; i<bwt_size; ++i) t[f[i].second] = i;
     free(f);
     
     int last_t = dollar_pos;
-    for (int i=0; i<n; ++i) {
+    for (int i=1; i<=n; ++i) {
         last_t = t[last_t];
-        s[n-i-1] = data[last_t];
+        s[n-i] = data[last_t];
     }
     free(t);
+    
     
     return s;
 }
@@ -831,6 +874,7 @@ void SuffixArray::doSuffixArrayComputation(int* s, int* SA, int n, int K) {
 
 /*********** Testing Utilities ***************/
 
+
 void test_suffix_arrays() {
     int len = 9;
     int word[] = {1, 2, 3, 4, 5, 4, 3, 2, 1};
@@ -845,13 +889,10 @@ void test_suffix_arrays() {
             //printf("CORRECT: True suffix SA[%d] = %d\n", i, suffixes[i]);
         } else {
             printf("FAIL: True suffix SA[%d] is %d but found %d\n", i, true_suffixes[i], suffixes[i]);
-            goto test_suffix_arrays_cleanup;
+            return;
         }
     }
     printf("PASS: suffix array is correct\n");
-    
-test_suffix_arrays_cleanup:
-    return;
 }
 
 void test_bwt() {
@@ -924,7 +965,7 @@ vector<int> read_data(string filename) {
     data.insert(data.begin(), y);
     data.insert(data.begin(), x);    
     
-    printf("Read in %ld pH values with (x, y, L) = (%d, %d, %d)\n", data.size() - 3, x, y, L);
+    //printf("Read in %ld pH values with (x, y, L) = (%d, %d, %d)\n", data.size() - 3, x, y, L);
     
     return data;
 }
@@ -948,7 +989,7 @@ void test_compression_on_file(string filename) {
             exit(1);
         }
     }
-    cout << "Verified that all " << compressed.size() << " compressed ints are in within [0, 255] legal range" << endl;
+    //cout << "Verified that all " << compressed.size() << " compressed ints are in within [0, 255] legal range" << endl;
     
     vector<int> decompressed = dat.decompress(compressed);
     
@@ -978,18 +1019,14 @@ void investigate_file(string filename) {
 }
 
 int main() {
-    DATCompression *dat = new DATCompression();
-    
-    dat->init();
-    
     test_suffix_arrays();
     test_bwt();
     
-    //investigate_file("data/B28-39_100_100_acq_0007.tab");
+    // investigate_file("data/B28-39_100_100_acq_0007.tab");
     
     // test_compression_on_file("data/test.tab");
 
-    //test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
+    test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     //test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
