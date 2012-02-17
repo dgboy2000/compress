@@ -1,11 +1,14 @@
+#include <algorithm>
 #include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #define PH_MAX 16383
@@ -39,12 +42,12 @@ private:
     
     vector <int> encode_positive(vector <int> nonpositive);
     vector <int> decode_positive(vector <int> positive);
-    
-    vector <int> burrows_wheeler_encode(vector <int> data);
-    vector <int> burrows_wheeler_decode(vector <int> data);
 public:
     vector <int> compress(vector <int> data) { return huffman_compress(data); }
     vector <int> decompress(vector <int> compressed) { return huffman_decompress(compressed); }
+    
+    int *burrows_wheeler_encode(int *data, int n);
+    int *burrows_wheeler_decode(int *data, int n);
 
     vector <int> compute_diff_statistics(vector <int> data);
 
@@ -72,7 +75,7 @@ class SuffixArray {
     int n;
     int *sa, *s;
 public:
-    SuffixArray(vector<int> data);
+    SuffixArray(vector<int> *data);
     SuffixArray(int *data, int n);
     ~SuffixArray() { free(sa); free(s); }
     
@@ -640,35 +643,54 @@ vector<int> DATCompression::decode_positive(vector<int> positive) {
 // the 0-based index in the BWT matrix of the first row that contains the original string.
 // The corresponding '$' character has been replaced with int min in the bwt sequence that follows.
 // The return vector is therefore 2 longer than the input vector.
-vector<int> DATCompression::burrows_wheeler_encode(vector<int> data) {
-    SuffixArray sa(data);
+int *DATCompression::burrows_wheeler_encode(int *data, int n) {
+    SuffixArray sa(data, n);
     
-    vector<int> bwt;
+    int *bwt = (int *) calloc(n+2, sizeof(int));
     int dollar_ind;
-    bwt.reserve(sa.size() + 2);
-    bwt.push_back(data.back());
+    bwt[0] = data[n-1];
     
-    for (int i=0; i<sa.size(); ++i) {
+    for (int i=0; i<n; ++i) {
         if (sa[i] == 0) {
-            bwt.push_back(INT_MIN);
+            bwt[i+1] = INT_MIN;
             dollar_ind = i + 1;
         }
-        else bwt.push_back(data[sa[i] - 1]);
+        else bwt[i+1] = data[sa[i] - 1];
     }
     
-    bwt.push_back(dollar_ind);
+    bwt[n+1] = dollar_ind;
     
     return bwt;
 }
 
-// // Takes a BWT vector of the format output by burrows_wheeler_encode and returns the original
-// // string, without the '$' character. The return vector is therefore 1 shorter than the input vector.
-// vector<int> DATCompression::burrows_wheeler_decode(vector<int> data) {
-//     int dollar_pos = data.back();
-//     vector<int>::iterator viter = data.begin();
-//     for (int i=0; i<dollar_pos; ++i) ++viter;
-//     data.push
-// }
+bool int_comparator(int i,int j) { return (i<j); }
+bool pair_comparator(pair<int,int> a, pair<int,int> b) { return (a.first < b.first); } // Compare pairs by first elt
+// Takes a BWT vector of the format output by burrows_wheeler_encode and returns the original
+// string, without the '$' character and without the I int on the end.
+// The return vector is therefore 2 shorter than the input vector.
+int *DATCompression::burrows_wheeler_decode(int *data, int n) {
+    int dollar_pos = data[n+1];
+    int bwt_size = n + 1;
+    
+    pair<int,int> *f = (pair<int,int> *) calloc(bwt_size, sizeof(pair<int,int>));
+    int *t = (int *) calloc(bwt_size, sizeof(int));
+    int *s = (int *) calloc(n, sizeof(int));
+    
+    for (int i=0; i<bwt_size; ++i) f[i] = pair<int,int>(data[i], i);
+    sort(f, f + bwt_size * (sizeof(pair<int,int>)), pair_comparator);
+    
+    for (int i=0; i<bwt_size; ++i) t[f[i].second] = i;
+    free(f);
+    
+    int last_t = dollar_pos;
+    for (int i=0; i<n; ++i) {
+        last_t = t[last_t];
+        s[n-i-1] = data[last_t];
+    }
+    free(t);
+    
+    return s;
+}
 
 
 vector<int> DATCompression::compute_diff_statistics(vector<int> data) {
@@ -690,26 +712,11 @@ vector<int> DATCompression::compute_diff_statistics(vector<int> data) {
 }
 
 
-void SuffixArray::print() {
-    for (int i=0; i<(n+3); ++i) {
-        printf("s[%d] = %d\n", i, s[i]);
-    }
-    for (int i=0; i<n; ++i) {
-        printf("sa[%d] = %d\n", i, sa[i]);
-    }
-}
-
-SuffixArray::SuffixArray(vector<int> data) {
-    n = data.size();
-    
+SuffixArray::SuffixArray(vector<int> *data) {
+    n = data->size();    
     s = (int *) calloc(n + 3, sizeof(int));
-    int *cur_data_elt = s;
-    
-    vector<int>::iterator data_end = data.end();
-    for (vector<int>::iterator viter=data.begin(); viter!=data_end; ++viter) {
-        *cur_data_elt = *viter;
-        ++cur_data_elt;
-    }
+
+    copy(data->begin(), data->end(), s);
     
     prepareSuffixArray();
 }
@@ -725,7 +732,7 @@ SuffixArray::SuffixArray(int *data, int _n) {
 
 void SuffixArray::prepareSuffixArray() {
     // Add 3 trailing zeroes for skew algorithm
-    int *cur_data_elt = s + (sizeof(int)) * n;
+    int *cur_data_elt = s + n;
     *cur_data_elt = 0; ++cur_data_elt;
     *cur_data_elt = 0; ++cur_data_elt;
     *cur_data_elt = 0; ++cur_data_elt;
@@ -737,6 +744,17 @@ void SuffixArray::prepareSuffixArray() {
 int * SuffixArray::getSuffixArray() {
     return sa;
 }
+
+
+void SuffixArray::print() {
+    for (int i=0; i<(n+3); ++i) {
+        printf("s[%d] = %d\n", i, s[i]);
+    }
+    for (int i=0; i<n; ++i) {
+        printf("sa[%d] = %d\n", i, sa[i]);
+    }
+}
+
 
 
 
@@ -819,14 +837,45 @@ void test_suffix_arrays() {
     int true_suffixes[] = {8, 0, 7, 1, 6, 2, 5, 3, 4};
     
     SuffixArray sa(word, len);
-    sa.print();
     int *suffixes = sa.getSuffixArray();
     
     
     for (int i=0; i<len; ++i) {
-        if (suffixes[i] == true_suffixes[i]) printf("CORRECT: True suffix SA[%d] = %d\n", i, suffixes[i]);
-        else printf("ERROR: True suffix SA[%d] is %d but found %d\n", i, true_suffixes[i], suffixes[i]);
+        if (suffixes[i] == true_suffixes[i]) {
+            //printf("CORRECT: True suffix SA[%d] = %d\n", i, suffixes[i]);
+        } else {
+            printf("FAIL: True suffix SA[%d] is %d but found %d\n", i, true_suffixes[i], suffixes[i]);
+            goto test_suffix_arrays_cleanup;
+        }
     }
+    printf("PASS: suffix array is correct\n");
+    
+test_suffix_arrays_cleanup:
+    return;
+}
+
+void test_bwt() {
+    int n = 6;
+    int s[] = {0,1,3,0,2,0};
+    int bwt_expected[] = {0,2,INT_MIN,3,0,0,1,2};
+    int *bwt, *decoded;
+    
+    DATCompression dat;
+    dat.init();
+    
+    bwt = dat.burrows_wheeler_encode(s, n);
+    decoded = dat.burrows_wheeler_decode(bwt, n);
+    
+    for (int i=0; i<n+2; ++i) {
+        if (bwt[i] != bwt_expected[i]) {
+            printf("FAIL: bwt[%d] = %d != bwt_expected[%d] = %d\n", i, bwt[i], i, bwt_expected[i]);
+            goto test_btw_cleanup;
+        }
+    }
+    printf("PASS: bwt is correct\n");
+test_btw_cleanup:
+    free(bwt);
+    free(decoded);
 }
 
 vector<int> read_data(string filename) {
@@ -934,6 +983,7 @@ int main() {
     dat->init();
     
     test_suffix_arrays();
+    test_bwt();
     
     //investigate_file("data/B28-39_100_100_acq_0007.tab");
     
