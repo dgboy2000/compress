@@ -1,10 +1,11 @@
+#include <climits>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <sstream>
-#include <cstring>
 #include <vector>
 
 #define PH_MAX 16383
@@ -51,6 +52,40 @@ public:
         golomb_n = 4;
     }
 };
+
+
+class SuffixArray {
+    inline bool leq(int a1, int a2, int b1, int b2) // lexicographic order
+        {return(a1 < b1 || a1 == b1 && a2 <= b2); } // for pairs
+    inline bool leq(int a1, int a2, int a3, int b1, int b2, int b3)
+        {return(a1 < b1 || a1 == b1 && leq(a2,a3, b2,b3)); } // and triples
+    
+    // stably sort a[0..n-1] to b[0..n-1] with keys in 0..K from r
+    void radixPass(int* a, int* b, int* r, int n, int K);
+    
+    // find the suffix array SA of s[0..n-1] in {1..K}ˆn
+    // require s[n]=s[n+1]=s[n+2]=0, n>=2
+    void doSuffixArrayComputation(int* s, int* SA, int n, int K);
+    
+    void prepareSuffixArray();
+    
+    int n;
+    int *sa, *s;
+public:
+    SuffixArray(vector<int> data);
+    SuffixArray(int *data, int n);
+    ~SuffixArray() { free(sa); free(s); }
+    
+    inline int operator[](int index) { return sa[index]; }
+    inline long int size() { return n; }
+    
+    void print();
+    
+    int *getSuffixArray();
+    int *getString() { return s; }
+};
+
+
 
 vector<int> DATCompression::identity_compress(vector<int> data) {
     vector<int> compressed;
@@ -601,11 +636,39 @@ vector<int> DATCompression::decode_positive(vector<int> positive) {
     return nonpositive;
 }
 
-// Computes the BWT of the specified data. The returned vector contains as it's first element
-// the 0-based index in the BWT matrix of the first row that contains the original string
-vector<int> DATCompression::burrows_wheeler_encode(vector<int> nonpositive) {
+// Computes the BWT of the specified data. The returned vector contains as it's last element
+// the 0-based index in the BWT matrix of the first row that contains the original string.
+// The corresponding '$' character has been replaced with int min in the bwt sequence that follows.
+// The return vector is therefore 2 longer than the input vector.
+vector<int> DATCompression::burrows_wheeler_encode(vector<int> data) {
+    SuffixArray sa(data);
     
+    vector<int> bwt;
+    int dollar_ind;
+    bwt.reserve(sa.size() + 2);
+    bwt.push_back(data.back());
+    
+    for (int i=0; i<sa.size(); ++i) {
+        if (sa[i] == 0) {
+            bwt.push_back(INT_MIN);
+            dollar_ind = i + 1;
+        }
+        else bwt.push_back(data[sa[i] - 1]);
+    }
+    
+    bwt.push_back(dollar_ind);
+    
+    return bwt;
 }
+
+// // Takes a BWT vector of the format output by burrows_wheeler_encode and returns the original
+// // string, without the '$' character. The return vector is therefore 1 shorter than the input vector.
+// vector<int> DATCompression::burrows_wheeler_decode(vector<int> data) {
+//     int dollar_pos = data.back();
+//     vector<int>::iterator viter = data.begin();
+//     for (int i=0; i<dollar_pos; ++i) ++viter;
+//     data.push
+// }
 
 
 vector<int> DATCompression::compute_diff_statistics(vector<int> data) {
@@ -626,33 +689,6 @@ vector<int> DATCompression::compute_diff_statistics(vector<int> data) {
     return diffs;
 }
 
-
-class SuffixArray {
-    inline bool leq(int a1, int a2, int b1, int b2) // lexicographic order
-        {return(a1 < b1 || a1 == b1 && a2 <= b2); } // for pairs
-    inline bool leq(int a1, int a2, int a3, int b1, int b2, int b3)
-        {return(a1 < b1 || a1 == b1 && leq(a2,a3, b2,b3)); } // and triples
-    
-    // stably sort a[0..n-1] to b[0..n-1] with keys in 0..K from r
-    void radixPass(int* a, int* b, int* r, int n, int K);
-    
-    // find the suffix array SA of s[0..n-1] in {1..K}ˆn
-    // require s[n]=s[n+1]=s[n+2]=0, n>=2
-    void doSuffixArrayComputation(int* s, int* SA, int n, int K);
-    
-    void prepareSuffixArray();
-    
-    int n;
-    int *sa, *s;
-public:
-    SuffixArray(vector<int> data);
-    SuffixArray(int *data, int n);
-    ~SuffixArray() { free(sa); free(s); }
-    
-    void print();
-    
-    int *getSuffixArray();
-};
 
 void SuffixArray::print() {
     for (int i=0; i<(n+3); ++i) {
