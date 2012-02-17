@@ -51,6 +51,9 @@ private:
 public:
     int *burrows_wheeler_encode(int *data, int n);
     int *burrows_wheeler_decode(int *data, int n);
+    
+    int *run_length_encode(int *data, int n);
+    int *run_length_decode(int *data, int n);
 
     vector <int> compress(vector <int> data) { return compression(data); }
     vector <int> decompress(vector <int> compressed) { return decompression(compressed); }
@@ -687,6 +690,45 @@ vector<int> DATCompression::decode_positive(vector<int> positive) {
     return nonpositive;
 }
 
+// Returns a vector of the form (length 1, char 1, length 2, char 2, ...)
+int *DATCompression::run_length_encode(int *data, int n) {
+    vector<int> encoded;
+    int *rle;
+    encoded.reserve(n); // Heuristic; reserve enough space for the data
+    
+    int i=0;
+    while (i < n) {
+        int run_int = data[i];
+        int run_count = 1;
+        ++i;
+        while (i < n && data[i] == run_int) {
+            ++run_count;
+            ++i;
+        }
+        encoded.push_back(run_count);
+        encoded.push_back(run_int);
+    }
+    
+    rle = (int *) calloc(encoded.size(), sizeof(encoded));
+    copy(encoded.begin(), encoded.end(), rle);
+    
+    return rle;
+}
+// Decode a vector in the format produced by run_length_encode
+int *DATCompression::run_length_decode(int *encoded, int n) {
+    int *decoded = (int *) calloc(n, sizeof(int));
+
+    int cur_ind = 0;
+    int total_count = 0;
+    while (total_count < n) {
+        int run_count = encoded[cur_ind++];
+        int run_int = encoded[cur_ind++];
+        for (int i=0; i<run_count; ++i) decoded[total_count++] = run_int;
+    }
+    
+    return decoded;
+}
+
 // Computes the BWT of the specified data. The returned vector contains as it's last element
 // the 0-based index in the BWT matrix of the first row that contains the original string.
 // The corresponding '$' character has been replaced with int min in the bwt sequence that follows.
@@ -927,6 +969,31 @@ test_btw_cleanup:
     free(decoded);
 }
 
+void test_rle() {
+    int n = 11;
+    int s[] = {0,0,0,0,1,1,0,1,1,0,0};
+    int rle_expected[] = {4,0,2,1,1,0,2,1,2,0};
+
+    int *encoded, *decoded;
+
+    DATCompression dat;
+    dat.init();
+
+    encoded = dat.run_length_encode(s, n);
+    decoded = dat.run_length_decode(encoded, n);
+
+    for (int i=0; i<n; ++i) {
+        if (s[i] != decoded[i]) {
+            printf("FAIL: s[%d] = %d != decoded[%d] = %d\n", i, s[i], i, decoded[i]);
+            goto test_rle_cleanup;
+        }
+    }
+    printf("PASS: rle is correct\n");
+test_rle_cleanup:
+    free(encoded);
+    free(decoded);
+}
+
 vector<int> read_data(string filename) {
     ifstream data_file;
     string data_line;
@@ -1029,12 +1096,13 @@ void investigate_file(string filename) {
 int main() {
     test_suffix_arrays();
     test_bwt();
+    test_rle();
     
     // investigate_file("data/B28-39_100_100_acq_0007.tab");
     
-    // test_compression_on_file("data/test.tab");
+    test_compression_on_file("data/test.tab");
 
-    test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
+    // test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     //test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
