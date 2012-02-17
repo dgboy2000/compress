@@ -132,14 +132,13 @@ vector<int> DATCompression::identity_decompress(vector<int> compressed) {
 vector <int> DATCompression::compression(vector<int> data)
 {
   vector <int> compressed;
+  int max_data, min_data;
   
-  //cout << data.size() << endl;
+  cout << data.size() << endl;
   compressed = diff_compress(data);
-  //cout << compressed.size() << endl;
-  compressed = encode_positive(compressed);
-  //cout << compressed.size() << endl;
+  cout << compressed.size() << endl;
   compressed = huffman_compress(compressed);
-  //cout << compressed.size() << endl;
+  cout << compressed.size() << endl;
 
   return compressed;
 }
@@ -149,7 +148,6 @@ vector <int> DATCompression::decompression(vector<int> compressed)
   vector <int> decompressed;
 
   decompressed = huffman_decompress(compressed);
-  decompressed = decode_positive(decompressed);
   decompressed = diff_decompress(decompressed);
 
   return decompressed;
@@ -166,13 +164,12 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
   memset(masked, 0, sizeof(masked));
   for(int i = 0; i < data.size(); i++)
   {
-    if(data[i] < 0 || data[i] >= HUFFMAN_MAX * HUFFMAN_MAX * HUFFMAN_MAX)
+    if(data[i] < 0 || data[i] >= HUFFMAN_MAX * HUFFMAN_MAX)
     {
-      cout << "Error: huffman_compress do not accept data out of range [0..4096]" << endl;
+      cout << "Error: huffman_compress do not accept data out of range [0..255]" << endl;
       exit(0);
     }
-    freq[data[i] / (HUFFMAN_MAX * HUFFMAN_MAX)]++;
-    freq[(data[i] % (HUFFMAN_MAX * HUFFMAN_MAX)) / HUFFMAN_MAX]++;
+    freq[data[i] / HUFFMAN_MAX]++;
     freq[data[i] % HUFFMAN_MAX]++;
   }
 
@@ -249,13 +246,11 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
 
   for(int i = 0; i < data.size(); i++)
   {
-    for(int k = 0; k < 3; k++)
+    for(int k = 0; k < 2; k++)
     {
       if(k == 0)
-        q = data[i] / (HUFFMAN_MAX * HUFFMAN_MAX);
-      else if(k == 1)
-        q = (data[i] % (HUFFMAN_MAX * HUFFMAN_MAX)) / HUFFMAN_MAX;
-      else if(k == 2)
+        q = data[i] / HUFFMAN_MAX;
+      else
         q = data[i] % HUFFMAN_MAX;
       for(int j = code[q].size() - 1; j >= 0; j--)
       {
@@ -289,7 +284,7 @@ vector<int> DATCompression::huffman_decompress(vector<int> compressed)
   vector<int> decompressed;
   vector<int> code[HUFFMAN_MAX];
   int code_pointer[HUFFMAN_MAX];
-  int number, d = 0, power = 1, code_ind = 0, c, temp = 0, t = 0, cur_bit, q, r, s, g = 0;
+  int number, d = 0, power = 1, code_ind = 0, c, temp = 0, t = 0, cur_bit, q, r, g = 0;
   int useless_bits = compressed[compressed.size() - 1];
   char status = 'd';
 
@@ -339,12 +334,10 @@ vector<int> DATCompression::huffman_decompress(vector<int> compressed)
               memset(code_pointer, 0, sizeof(code_pointer));
               if(g == 0)
                 q = k, g = 1;
-              else if(g == 1)
-                r = k, g = 2;
-              else if(g == 2)
+              else
               {
-                s = k, g = 0;
-                decompressed.push_back(q * (HUFFMAN_MAX * HUFFMAN_MAX) + r * HUFFMAN_MAX + s);
+                r = k, g = 0;
+                decompressed.push_back(q * HUFFMAN_MAX + r);
               }
               break;
             }
