@@ -133,9 +133,13 @@ vector <int> DATCompression::compression(vector<int> data)
 {
   vector <int> compressed;
   
+  //cout << data.size() << endl;
   compressed = diff_compress(data);
+  //cout << compressed.size() << endl;
   compressed = encode_positive(compressed);
+  //cout << compressed.size() << endl;
   compressed = huffman_compress(compressed);
+  //cout << compressed.size() << endl;
 
   return compressed;
 }
@@ -235,6 +239,13 @@ vector<int> DATCompression::huffman_compress(vector<int> data)
       }
     }
   }
+
+  /*for(int i = 0; i < HUFFMAN_MAX; i++)
+  {
+    for(int j = code[i].size() - 1; j >= 0; j--)
+      cout << code[i][j] << " ";
+    cout << endl;
+  }*/
 
   for(int i = 0; i < data.size(); i++)
   {
@@ -901,7 +912,7 @@ vector<int> read_data(string filename) {
     data.insert(data.begin(), y);
     data.insert(data.begin(), x);    
     
-    printf("Read in %ld pH values with (x, y, L) = (%d, %d, %d)\n", data.size() - 3, x, y, L);
+    //printf("Read in %ld pH values with (x, y, L) = (%d, %d, %d)\n", data.size() - 3, x, y, L);
     
     return data;
 }
@@ -925,7 +936,7 @@ void test_compression_on_file(string filename) {
             exit(1);
         }
     }
-    cout << "Verified that all " << compressed.size() << " compressed ints are in within [0, 255] legal range" << endl;
+    //cout << "Verified that all " << compressed.size() << " compressed ints are in within [0, 255] legal range" << endl;
     
     vector<int> decompressed = dat.decompress(compressed);
     
@@ -940,8 +951,8 @@ void test_compression_on_file(string filename) {
         }
     }
     
-    printf("Correctly recovered the original %ld elements of the data\n", data.size());
-    printf("TopCoder Compression ratio is %f\n", 2 * data.size() / (float) compressed.size());
+    //printf("Correctly recovered the original %ld elements of the data\n", data.size());
+    //printf("TopCoder Compression ratio is %f\n", 2 * data.size() / (float) compressed.size());
 }
 
 void investigate_file(string filename) {
@@ -965,10 +976,10 @@ int main() {
     
     //test_compression_on_file("data/test.tab");
 
-    //test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
+    test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     //test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
-    test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
+    //test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
     
     return 0;
 }
