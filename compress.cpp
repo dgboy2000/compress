@@ -13,6 +13,8 @@
 
 #define PH_MAX 16383
 #define HUFFMAN_MAX 16
+#define RUN_MIN 4
+#define RUN_MAX 259
 
 using namespace std;
 
@@ -53,7 +55,7 @@ public:
     int *burrows_wheeler_decode(int *data, int n);
     
     int *run_length_encode(int *data, int n);
-    int *run_length_decode(int *data, int n);
+    int *run_length_decode(int *data);
 
     vector <int> compress(vector <int> data) { return compression(data); }
     vector <int> decompress(vector <int> compressed) { return decompression(compressed); }
@@ -689,7 +691,9 @@ vector<int> DATCompression::decode_positive(vector<int> positive) {
     return nonpositive;
 }
 
-// Returns a vector of the form (length 1, char 1, length 2, char 2, ...)
+// Returns a vector where every run of length RUN_MIN or higher has been
+// encoded as A{RUN_MIN}(run_count - RUN_MIN). The first entry is the length
+// of the original uncompressed vector
 int *DATCompression::run_length_encode(int *data, int n) {
     vector<int> encoded;
     int *rle;
@@ -700,28 +704,35 @@ int *DATCompression::run_length_encode(int *data, int n) {
         int run_int = data[i];
         int run_count = 1;
         ++i;
-        while (i < n && data[i] == run_int) {
+        while (i < n && data[i] == run_int && run_count < RUN_MAX) {
             ++run_count;
             ++i;
         }
-        encoded.push_back(run_count);
-        encoded.push_back(run_int);
+        for (int j=0; j<run_count && j<RUN_MIN; ++j) encoded.push_back(run_int);
+        if (run_count >= RUN_MIN) encoded.push_back(run_count - RUN_MIN);
     }
     
-    rle = (int *) calloc(encoded.size(), sizeof(encoded));
-    copy(encoded.begin(), encoded.end(), rle);
+    rle = (int *) calloc(encoded.size()+1, sizeof(encoded));
+    rle[0] = n;
+    copy(encoded.begin(), encoded.end(), rle+1);
     
     return rle;
 }
 // Decode a vector in the format produced by run_length_encode
-int *DATCompression::run_length_decode(int *encoded, int n) {
+int *DATCompression::run_length_decode(int *encoded) {
+    int n = encoded[0];
     int *decoded = (int *) calloc(n, sizeof(int));
 
-    int cur_ind = 0;
+    int cur_ind = 1;
     int total_count = 0;
     while (total_count < n) {
-        int run_count = encoded[cur_ind++];
         int run_int = encoded[cur_ind++];
+        int run_count = 1;
+        while (encoded[cur_ind] == run_int && run_count < RUN_MIN) {
+            ++cur_ind;
+            ++run_count;
+        }
+        if (run_count == RUN_MIN) run_count += encoded[cur_ind++];
         for (int i=0; i<run_count; ++i) decoded[total_count++] = run_int;
     }
     
@@ -969,9 +980,9 @@ test_btw_cleanup:
 }
 
 void test_rle() {
-    int n = 11;
-    int s[] = {0,0,0,0,1,1,0,1,1,0,0};
-    int rle_expected[] = {4,0,2,1,1,0,2,1,2,0};
+    int n = 14;
+    int s[] = {0,0,0,0,0,1,1,1,1,0,1,1,0,0};
+    int rle_expected[] = {n,0,0,0,0,1,1,1,1,1,0,0,1,1,0,0};
 
     int *encoded, *decoded;
 
@@ -979,7 +990,7 @@ void test_rle() {
     dat.init();
 
     encoded = dat.run_length_encode(s, n);
-    decoded = dat.run_length_decode(encoded, n);
+    decoded = dat.run_length_decode(encoded);
 
     for (int i=0; i<n; ++i) {
         if (s[i] != decoded[i]) {
@@ -1099,12 +1110,12 @@ int main() {
     
     // investigate_file("data/B28-39_100_100_acq_0007.tab");
     
-    test_compression_on_file("data/test.tab");
+    // test_compression_on_file("data/test.tab");
 
     // test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
-    //test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
+    // test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
-    test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
+    // test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
     
     return 0;
 }
