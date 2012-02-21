@@ -54,8 +54,14 @@ public:
     int *burrows_wheeler_encode(int *data, int n);
     int *burrows_wheeler_decode(int *data, int n);
     
+    vector<int> burrows_wheeler_encode(vector<int> data);
+    vector<int> burrows_wheeler_decode(vector<int> data);
+    
     int *run_length_encode(int *data, int n);
     int *run_length_decode(int *data);
+    
+    vector <int> run_length_encode(vector <int> data);
+    vector <int> run_length_decode(vector <int> data);
 
     vector <int> compress(vector <int> data) { return compression(data); }
     vector <int> decompress(vector <int> compressed) { return decompression(compressed); }
@@ -146,6 +152,12 @@ vector <int> DATCompression::compression(vector<int> data)
   
   compressed = diff_compress(data);
   compressed = huffman_compress(compressed);
+  
+  // diff_compress
+  // rle
+  // bwt
+  // rle
+  // huffman
 
   return compressed;
 }
@@ -739,6 +751,49 @@ int *DATCompression::run_length_decode(int *encoded) {
     return decoded;
 }
 
+// Returns a vector where every run of length RUN_MIN or higher has been
+// encoded as A{RUN_MIN}(run_count - RUN_MIN).
+vector<int> DATCompression::run_length_encode(vector<int> data) {
+    int n = data.size();
+    vector<int> encoded;
+    encoded.reserve(n); // Heuristic; reserve enough space for the data
+    
+    int i=0;
+    while (i < n) {
+        int run_int = data[i];
+        int run_count = 1;
+        ++i;
+        while (i < n && data[i] == run_int && run_count < RUN_MAX) {
+            ++run_count;
+            ++i;
+        }
+        for (int j=0; j<run_count && j<RUN_MIN; ++j) encoded.push_back(run_int);
+        if (run_count >= RUN_MIN) encoded.push_back(run_count - RUN_MIN);
+    }
+    
+    return encoded;
+}
+// Decode a vector in the format produced by run_length_encode
+vector<int> DATCompression::run_length_decode(vector<int> encoded) {
+    int n = encoded.size();
+    vector<int> decoded;
+    decoded.reserve(n); // Heuristic; reserve some space for the data
+
+    vector<int>::iterator viter = encoded.begin(), data_end = encoded.end();
+    while (viter != data_end) {
+        int run_int = *(viter++);
+        int run_count = 1;
+        while (*viter == run_int && run_count < RUN_MIN) {
+            ++viter;
+            ++run_count;
+        }
+        if (run_count == RUN_MIN) run_count += *(viter++);
+        for (int i=0; i<run_count; ++i) decoded.push_back(run_int);
+    }
+    
+    return decoded;
+}
+
 // Computes the BWT of the specified data. The returned vector contains as it's last element
 // the 0-based index in the BWT matrix of the first row that contains the original string.
 // The corresponding '$' character has been replaced with int min in the bwt sequence that follows.
@@ -763,6 +818,35 @@ int *DATCompression::burrows_wheeler_encode(int *data, int n) {
     return bwt;
 }
 
+// Computes the BWT of the specified data. The returned vector contains as it's last element
+// the 0-based index in the BWT matrix of the first row that contains the original string.
+// The corresponding '$' character has been replaced with 0 in the bwt sequence that follows.
+// The return vector is therefore 2 longer than the input vector. This also assumes that
+// the input data is non-negative.
+vector<int> DATCompression::burrows_wheeler_encode(vector<int> data) {
+    int n = data.size();
+    SuffixArray sa(&data);
+    
+    vector<int> bwt;
+    bwt.resize(n+2);
+    vector<int>::iterator bwt_iter = bwt.begin();
+    
+    int dollar_ind;
+    *(bwt_iter++) = data.back();
+    
+    for (int i=0; i<n; ++i) {
+        if (sa[i] == 0) {
+            *(bwt_iter++) = 0;
+            dollar_ind = i + 1;
+        }
+        else *(bwt_iter++) = data[sa[i] - 1];
+    }
+    
+    *bwt_iter = dollar_ind;
+    
+    return bwt;
+}
+
 bool int_comparator(int i,int j) { return (i<j); }
 bool pair_comparator(pair<int,int> a, pair<int,int> b) { return (a.first < b.first); } // Compare pairs by first elt
 // Takes a BWT vector of the format output by burrows_wheeler_encode and returns the original
@@ -771,8 +855,6 @@ bool pair_comparator(pair<int,int> a, pair<int,int> b) { return (a.first < b.fir
 int *DATCompression::burrows_wheeler_decode(int *data, int n) {
     int dollar_pos = data[n+1];
     int bwt_size = n + 1;
-
-
     
     pair<int,int> *f = (pair<int,int> *) calloc(bwt_size, sizeof(pair<int,int>));
     int *t = (int *) calloc(bwt_size, sizeof(int));
@@ -791,6 +873,35 @@ int *DATCompression::burrows_wheeler_decode(int *data, int n) {
     }
     free(t);
     
+    return s;
+}
+// Takes a BWT vector of the format output by burrows_wheeler_encode and returns the original
+// string, without the '$' character and without the I int on the end.
+// The return vector is therefore 2 shorter than the input vector.
+vector<int> DATCompression::burrows_wheeler_decode(vector<int> data) {
+    int n = data.size() - 2;
+    int dollar_pos = data[n+1];
+    int bwt_size = n + 1;
+    
+    pair<int,int> *f = (pair<int,int> *) calloc(bwt_size-1, sizeof(pair<int,int>));
+    int *t = (int *) calloc(bwt_size, sizeof(int));
+    vector<int> s;
+    s.resize(n);
+    
+    for (int i=0; i<dollar_pos; ++i) f[i] = pair<int,int>(data[i], i);
+    for (int i=dollar_pos+1; i<bwt_size; ++i) f[i-1] = pair<int,int>(data[i], i);
+    sort(f, f + bwt_size - 1, pair_comparator);
+    
+    t[dollar_pos] = 0;
+    for (int i=1; i<bwt_size; ++i) t[f[i-1].second] = i;
+    free(f);
+    
+    int last_t = dollar_pos;
+    for (vector<int>::reverse_iterator viter = s.rbegin(); viter != s.rend(); ++viter) {
+        last_t = t[last_t];
+        *viter = data[last_t];
+    }
+    free(t);
     
     return s;
 }
@@ -961,6 +1072,8 @@ void test_bwt() {
     int bwt_expected[] = {0,2,INT_MIN,3,0,0,1,2};
     int *bwt, *decoded;
     
+    vector<int> vec_s, vec_bwt, vec_bwt_expected, vec_decoded;
+    
     DATCompression dat;
     dat.init();
     
@@ -973,7 +1086,41 @@ void test_bwt() {
             goto test_btw_cleanup;
         }
     }
-    printf("PASS: bwt is correct\n");
+    printf("PASS: burrows_wheeler_encode is correct\n");
+    
+    for (int i=0; i<n; ++i) {
+        if (s[i] != decoded[i]) {
+            printf("FAIL: s[%d] = %d != decoded[%d] = %d\n", i, s[i], i, decoded[i]);
+            goto test_btw_cleanup;
+        }
+    }
+    printf("PASS: burrows_wheeler_decode is correct\n");
+    
+    vec_s.reserve(n);
+    vec_bwt_expected.reserve(n+2);
+    copy(s, s+n, back_inserter(vec_s));
+    copy(bwt_expected, bwt_expected+n+2, back_inserter(vec_bwt_expected));
+    vec_bwt_expected[vec_bwt_expected.back()] = 0; // In vector bwt, $ is '0' instead of 'INT_MIN'
+    
+    vec_bwt = dat.burrows_wheeler_encode(vec_s);
+    vec_decoded = dat.burrows_wheeler_decode(vec_bwt);
+    
+    for (int i=0; i<n+2; ++i) {
+        if (vec_bwt[i] != vec_bwt_expected[i]) {
+            printf("FAIL: vec_bwt[%d] = %d != vec_bwt_expected[%d] = %d\n", i, bwt[i], i, bwt_expected[i]);
+            goto test_btw_cleanup;
+        }
+    }
+    printf("PASS: vector burrows_wheeler_encode is correct\n");
+    
+    for (int i=0; i<n; ++i) {
+        if (vec_s[i] != vec_decoded[i]) {
+            printf("FAIL: vec_s[%d] = %d != vec_decoded[%d] = %d\n", i, vec_s[i], i, vec_decoded[i]);
+            goto test_btw_cleanup;
+        }
+    }
+    printf("PASS: vector burrows_wheeler_decode is correct\n");
+    
 test_btw_cleanup:
     free(bwt);
     free(decoded);
@@ -985,6 +1132,8 @@ void test_rle() {
     int rle_expected[] = {n,0,0,0,0,1,1,1,1,1,0,0,1,1,0,0};
 
     int *encoded, *decoded;
+
+    vector<int> vec_s, vec_encoded, vec_decoded;
 
     DATCompression dat;
     dat.init();
@@ -999,6 +1148,18 @@ void test_rle() {
         }
     }
     printf("PASS: rle is correct\n");
+    
+    copy(s, s+n, back_inserter(vec_s));
+    vec_encoded = dat.run_length_encode(vec_s);
+    vec_decoded = dat.run_length_decode(vec_encoded);
+    for (int i=0; i<n; ++i) {
+        if (vec_s[i] != vec_decoded[i]) {
+            printf("FAIL: vec_s[%d] = %d != vec_decoded[%d] = %d\n", i, vec_s[i], i, vec_decoded[i]);
+            goto test_rle_cleanup;
+        }
+    }
+    printf("PASS: vector rle is correct\n");
+    
 test_rle_cleanup:
     free(encoded);
     free(decoded);
@@ -1013,6 +1174,8 @@ vector<int> read_data(string filename) {
     
     int x, y, x_ind, y_ind, L, valCnt, lineCnt;
     string pHval;
+    x = 0;
+    y = 0;
     L = 0;
     lineCnt = 0;
     while (getline(data_file, data_line)) {
@@ -1110,9 +1273,9 @@ int main() {
     
     // investigate_file("data/B28-39_100_100_acq_0007.tab");
     
-    // test_compression_on_file("data/test.tab");
+    test_compression_on_file("data/test.tab");
 
-    // test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
+    test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     // test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
     // test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
