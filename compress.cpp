@@ -804,14 +804,15 @@ vector<int> DATCompression::run_length_decode(vector<int> encoded) {
     return decoded;
 }
 
-// Computes the BWT of the specified data. The returned vector contains as it's last element
+// Computes the BWT of the specified data. The returned vector contains as it's last 3 elements
 // the 0-based index in the BWT matrix of the first row that contains the original string.
+// This index can be very large, so it is represented as a 3 byte integer.
 // The corresponding '$' character has been replaced with int min in the bwt sequence that follows.
-// The return vector is therefore 2 longer than the input vector.
+// The return vector is therefore 4 longer than the input vector.
 int *DATCompression::burrows_wheeler_encode(int *data, int n) {
     SuffixArray sa(data, n);
     
-    int *bwt = (int *) calloc(n+2, sizeof(int));
+    int *bwt = (int *) calloc(n+4, sizeof(int));
     int dollar_ind;
     bwt[0] = data[n-1];
     
@@ -823,22 +824,24 @@ int *DATCompression::burrows_wheeler_encode(int *data, int n) {
         else bwt[i+1] = data[sa[i] - 1];
     }
     
-    bwt[n+1] = dollar_ind;
+    bwt[n+1] = dollar_ind / (256*256);
+    bwt[n+2] = (dollar_ind / 256) % 256;
+    bwt[n+3] = dollar_ind % 256;
     
     return bwt;
 }
 
-// Computes the BWT of the specified data. The returned vector contains as it's last element
+// Computes the BWT of the specified data. The returned vector contains as it's last 3 elements
 // the 0-based index in the BWT matrix of the first row that contains the original string.
-// The corresponding '$' character has been replaced with 0 in the bwt sequence that follows.
-// The return vector is therefore 2 longer than the input vector. This also assumes that
-// the input data is non-negative.
+// This index can be very large, so it is represented as a 3 byte integer.
+// The corresponding '$' character has been replaced with int min in the bwt sequence that follows.
+// The return vector is therefore 4 longer than the input vector.
 vector<int> DATCompression::burrows_wheeler_encode(vector<int> data) {
     int n = data.size();
     SuffixArray sa(&data);
     
     vector<int> bwt;
-    bwt.resize(n+2);
+    bwt.resize(n+4);
     vector<int>::iterator bwt_iter = bwt.begin();
     
     int dollar_ind;
@@ -852,7 +855,9 @@ vector<int> DATCompression::burrows_wheeler_encode(vector<int> data) {
         else *(bwt_iter++) = data[sa[i] - 1];
     }
     
-    *bwt_iter = dollar_ind;
+    *(bwt_iter++) = dollar_ind / (256*256);
+    *(bwt_iter++) = (dollar_ind / 256) % 256;
+    *(bwt_iter++) = dollar_ind % 256;
     
     return bwt;
 }
@@ -860,10 +865,10 @@ vector<int> DATCompression::burrows_wheeler_encode(vector<int> data) {
 bool int_comparator(int i,int j) { return (i<j); }
 bool pair_comparator(pair<int,int> a, pair<int,int> b) { return (a.first < b.first); } // Compare pairs by first elt
 // Takes a BWT vector of the format output by burrows_wheeler_encode and returns the original
-// string, without the '$' character and without the I int on the end.
-// The return vector is therefore 2 shorter than the input vector.
+// string, without the '$' character and without the I integers on the end.
+// The return vector is therefore 4 shorter than the input vector.
 int *DATCompression::burrows_wheeler_decode(int *data, int n) {
-    int dollar_pos = data[n+1];
+    int dollar_pos = 256*256*data[n+1] + 256*data[n+2] + data[n+3];
     int bwt_size = n + 1;
     
     pair<int,int> *f = (pair<int,int> *) calloc(bwt_size, sizeof(pair<int,int>));
@@ -886,11 +891,11 @@ int *DATCompression::burrows_wheeler_decode(int *data, int n) {
     return s;
 }
 // Takes a BWT vector of the format output by burrows_wheeler_encode and returns the original
-// string, without the '$' character and without the I int on the end.
-// The return vector is therefore 2 shorter than the input vector.
+// string, without the '$' character and without the I integers on the end.
+// The return vector is therefore 4 shorter than the input vector.
 vector<int> DATCompression::burrows_wheeler_decode(vector<int> data) {
-    int n = data.size() - 2;
-    int dollar_pos = data[n+1];
+    int n = data.size() - 4;
+    int dollar_pos = 256*256*data[n+1] + 256*data[n+2] + data[n+3];
     int bwt_size = n + 1;
     
     pair<int,int> *f = (pair<int,int> *) calloc(bwt_size-1, sizeof(pair<int,int>));
@@ -1288,7 +1293,7 @@ int main() {
     
     // test_compression_on_file("data/test.tab");
 
-    test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
+    // test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     // test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
     // test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
