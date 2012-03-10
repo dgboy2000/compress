@@ -150,14 +150,16 @@ vector <int> DATCompression::compression(vector<int> data)
 {
   vector <int> compressed;
   
-  compressed = diff_compress(data);
-  compressed = huffman_compress(compressed);
+  // // Simple compression stack
+  // compressed = diff_compress(data);
+  // compressed = huffman_compress(compressed);
   
-  // diff_compress
-  // rle
-  // bwt
-  // rle
-  // huffman
+  // bzip-inspired compression stack (but simpler)
+  compressed = diff_compress(data);
+  compressed = run_length_encode(compressed);
+  // compressed = burrows_wheeler_encode(compressed);
+  compressed = run_length_encode(compressed);
+  compressed = huffman_compress(compressed);
 
   return compressed;
 }
@@ -165,8 +167,16 @@ vector <int> DATCompression::compression(vector<int> data)
 vector <int> DATCompression::decompression(vector<int> compressed)
 {
   vector <int> decompressed;
+  
+  // // Simple decompression stack
+  // decompressed = huffman_decompress(compressed);
+  // decompressed = diff_decompress(decompressed);
 
+  // bzip-inspired decompression stack (but simpler)
   decompressed = huffman_decompress(compressed);
+  decompressed = run_length_decode(decompressed);
+  // decompressed = burrows_wheeler_decode(decompressed);
+  decompressed = run_length_decode(decompressed);
   decompressed = diff_decompress(decompressed);
 
   return decompressed;
@@ -783,7 +793,7 @@ vector<int> DATCompression::run_length_decode(vector<int> encoded) {
     while (viter != data_end) {
         int run_int = *(viter++);
         int run_count = 1;
-        while (*viter == run_int && run_count < RUN_MIN) {
+        while (*viter == run_int && run_count < RUN_MIN && viter != data_end) {
             ++viter;
             ++run_count;
         }
@@ -946,13 +956,16 @@ SuffixArray::SuffixArray(int *data, int _n) {
 
 void SuffixArray::prepareSuffixArray() {
     // Add 3 trailing zeroes for skew algorithm
+    int i;
     int *cur_data_elt = s + n;
     *cur_data_elt = 0; ++cur_data_elt;
     *cur_data_elt = 0; ++cur_data_elt;
     *cur_data_elt = 0; ++cur_data_elt;
     
     sa = (int *) calloc(n, sizeof(int));
-    doSuffixArrayComputation(s, sa, n, 16);
+    for (i=0; i<n; ++i) ++s[i];
+    doSuffixArrayComputation(s, sa, n, 256);
+    for (i=0; i<n; ++i) --s[i];
 }
 
 int * SuffixArray::getSuffixArray() {
@@ -1273,7 +1286,7 @@ int main() {
     
     // investigate_file("data/B28-39_100_100_acq_0007.tab");
     
-    test_compression_on_file("data/test.tab");
+    // test_compression_on_file("data/test.tab");
 
     test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     // test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
