@@ -1087,7 +1087,7 @@ void test_suffix_arrays() {
 void test_bwt() {
     int n = 6;
     int s[] = {0,1,3,0,2,0};
-    int bwt_expected[] = {0,2,INT_MIN,3,0,0,1,2};
+    int bwt_expected[] = {0,2,INT_MIN,3,0,0,1,0,0,2};
     int *bwt, *decoded;
     
     vector<int> vec_s, vec_bwt, vec_bwt_expected, vec_decoded;
@@ -1098,7 +1098,7 @@ void test_bwt() {
     bwt = dat.burrows_wheeler_encode(s, n);
     decoded = dat.burrows_wheeler_decode(bwt, n);
     
-    for (int i=0; i<n+2; ++i) {
+    for (int i=0; i<n+4; ++i) {
         if (bwt[i] != bwt_expected[i]) {
             printf("FAIL: bwt[%d] = %d != bwt_expected[%d] = %d\n", i, bwt[i], i, bwt_expected[i]);
             goto test_btw_cleanup;
@@ -1115,15 +1115,15 @@ void test_bwt() {
     printf("PASS: burrows_wheeler_decode is correct\n");
     
     vec_s.reserve(n);
-    vec_bwt_expected.reserve(n+2);
+    vec_bwt_expected.reserve(n+4);
     copy(s, s+n, back_inserter(vec_s));
-    copy(bwt_expected, bwt_expected+n+2, back_inserter(vec_bwt_expected));
+    copy(bwt_expected, bwt_expected+n+4, back_inserter(vec_bwt_expected));
     vec_bwt_expected[vec_bwt_expected.back()] = 0; // In vector bwt, $ is '0' instead of 'INT_MIN'
     
     vec_bwt = dat.burrows_wheeler_encode(vec_s);
     vec_decoded = dat.burrows_wheeler_decode(vec_bwt);
     
-    for (int i=0; i<n+2; ++i) {
+    for (int i=0; i<n+4; ++i) {
         if (vec_bwt[i] != vec_bwt_expected[i]) {
             printf("FAIL: vec_bwt[%d] = %d != vec_bwt_expected[%d] = %d\n", i, bwt[i], i, bwt_expected[i]);
             goto test_btw_cleanup;
