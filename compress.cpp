@@ -976,6 +976,8 @@ void SuffixArray::prepareSuffixArray() {
     *cur_data_elt = 0; ++cur_data_elt;
     
     sa = (int *) calloc(n, sizeof(int));
+    
+    // Suffix array computation requires values in [1,256] instead of [0,255]
     for (i=0; i<n; ++i) ++s[i];
     doSuffixArrayComputation(s, sa, n, 256);
     for (i=0; i<n; ++i) --s[i];
