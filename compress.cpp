@@ -813,7 +813,7 @@ int *DATCompression::burrows_wheeler_encode(int *data, int n) {
     SuffixArray sa(data, n);
     
     int *bwt = (int *) calloc(n+4, sizeof(int));
-    int dollar_ind;
+    long int dollar_ind;
     bwt[0] = data[n-1];
     
     for (int i=0; i<n; ++i) {
@@ -844,7 +844,7 @@ vector<int> DATCompression::burrows_wheeler_encode(vector<int> data) {
     bwt.resize(n+4);
     vector<int>::iterator bwt_iter = bwt.begin();
     
-    int dollar_ind;
+    long int dollar_ind;
     *(bwt_iter++) = data.back();
     
     for (int i=0; i<n; ++i) {
@@ -868,7 +868,7 @@ bool pair_comparator(pair<int,int> a, pair<int,int> b) { return (a.first < b.fir
 // string, without the '$' character and without the I integers on the end.
 // The return vector is therefore 4 shorter than the input vector.
 int *DATCompression::burrows_wheeler_decode(int *data, int n) {
-    int dollar_pos = 256*256*data[n+1] + 256*data[n+2] + data[n+3];
+    long int dollar_pos = 256*256*data[n+1] + 256*data[n+2] + data[n+3];
     int bwt_size = n + 1;
     
     pair<int,int> *f = (pair<int,int> *) calloc(bwt_size, sizeof(pair<int,int>));
@@ -895,7 +895,7 @@ int *DATCompression::burrows_wheeler_decode(int *data, int n) {
 // The return vector is therefore 4 shorter than the input vector.
 vector<int> DATCompression::burrows_wheeler_decode(vector<int> data) {
     int n = data.size() - 4;
-    int dollar_pos = 256*256*data[n+1] + 256*data[n+2] + data[n+3];
+    long int dollar_pos = 256*256*data[n+1] + 256*data[n+2] + data[n+3];
     int bwt_size = n + 1;
     
     pair<int,int> *f = (pair<int,int> *) calloc(bwt_size-1, sizeof(pair<int,int>));
