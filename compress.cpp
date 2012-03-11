@@ -7,6 +7,8 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -148,36 +150,41 @@ vector<int> DATCompression::identity_decompress(vector<int> compressed) {
 
 vector <int> DATCompression::compression(vector<int> data)
 {
-  vector <int> compressed;
+    vector <int> compressed = data; printf("Original size before compression: %d\n", (int)compressed.size());
+    int i, n=30;
   
-  // // Simple compression stack
-  // compressed = diff_compress(data);
-  // compressed = huffman_compress(compressed);
-  
-  // bzip-inspired compression stack (but simpler)
-  compressed = diff_compress(data);
-  compressed = run_length_encode(compressed);
-  // compressed = burrows_wheeler_encode(compressed);
-  compressed = run_length_encode(compressed);
-  compressed = huffman_compress(compressed);
+    // // Simple compression stack
+    // compressed = diff_compress(data);
+    // compressed = huffman_compress(compressed);
 
-  return compressed;
+    // bzip-inspired compression stack (but simpler)
+    compressed = diff_compress(compressed); printf("Size after diff compression: %d\n", (int)compressed.size());
+    // compressed = run_length_encode(compressed);
+    
+    for (i=0;i<n;++i) printf("Before bwt encoding compressed[%d]: %d\n", i, compressed[i]);
+    compressed = burrows_wheeler_encode(compressed); printf("Size after bwt encoding: %d\n", (int)compressed.size());
+    // compressed = run_length_encode(compressed);
+    // compressed = huffman_compress(compressed);
+
+    return compressed;
 }
 
 vector <int> DATCompression::decompression(vector<int> compressed)
 {
-  vector <int> decompressed;
+  vector <int> decompressed = compressed; printf("Original size before decompression: %d\n", (int)decompressed.size());
+  int i,n=30;
   
   // // Simple decompression stack
-  // decompressed = huffman_decompress(compressed);
+  // decompressed = huffman_decompress(decompressed);
   // decompressed = diff_decompress(decompressed);
 
   // bzip-inspired decompression stack (but simpler)
-  decompressed = huffman_decompress(compressed);
-  decompressed = run_length_decode(decompressed);
-  // decompressed = burrows_wheeler_decode(decompressed);
-  decompressed = run_length_decode(decompressed);
-  decompressed = diff_decompress(decompressed);
+  // decompressed = huffman_decompress(compressed);
+  // decompressed = run_length_decode(decompressed);
+  decompressed = burrows_wheeler_decode(decompressed); printf("Size after bwt decoding: %d\n", (int)decompressed.size());
+  for (i=0;i<n;++i) printf("After bwt decoding decompressed[%d]: %d\n", i, decompressed[i]);
+  // decompressed = run_length_decode(decompressed);
+  decompressed = diff_decompress(decompressed); printf("Size after diff decompression: %d\n", (int)decompressed.size());
 
   return decompressed;
 }
@@ -876,7 +883,7 @@ int *DATCompression::burrows_wheeler_decode(int *data, int n) {
     int *s = (int *) calloc(n, sizeof(int));
     
     for (int i=0; i<bwt_size; ++i) f[i] = pair<int,int>(data[i], i);
-    sort(f, f + bwt_size, pair_comparator);
+    stable_sort(f, f + bwt_size, pair_comparator);
     
     for (int i=0; i<bwt_size; ++i) t[f[i].second] = i;
     free(f);
@@ -898,17 +905,16 @@ vector<int> DATCompression::burrows_wheeler_decode(vector<int> data) {
     long int dollar_pos = 256*256*data[n+1] + 256*data[n+2] + data[n+3];
     int bwt_size = n + 1;
     
-    pair<int,int> *f = (pair<int,int> *) calloc(bwt_size-1, sizeof(pair<int,int>));
+    pair<int,int> *f = (pair<int,int> *) calloc(bwt_size, sizeof(pair<int,int>));
     int *t = (int *) calloc(bwt_size, sizeof(int));
     vector<int> s;
     s.resize(n);
     
-    for (int i=0; i<dollar_pos; ++i) f[i] = pair<int,int>(data[i], i);
-    for (int i=dollar_pos+1; i<bwt_size; ++i) f[i-1] = pair<int,int>(data[i], i);
-    sort(f, f + bwt_size - 1, pair_comparator);
+    for (int i=0; i<bwt_size; ++i) f[i] = pair<int,int>(data[i], i);
+    f[dollar_pos].first = INT_MIN;
+    stable_sort(f, f + bwt_size, pair_comparator);
     
-    t[dollar_pos] = 0;
-    for (int i=1; i<bwt_size; ++i) t[f[i-1].second] = i;
+    for (int i=0; i<bwt_size; ++i) t[f[i].second] = i;
     free(f);
     
     int last_t = dollar_pos;
@@ -1085,7 +1091,7 @@ void test_suffix_arrays() {
 }
 
 void test_bwt() {
-    int n = 6;
+    int i, n = 6;
     int s[] = {0,1,3,0,2,0};
     int bwt_expected[] = {0,2,INT_MIN,3,0,0,1,0,0,2};
     int *bwt, *decoded;
@@ -1098,7 +1104,7 @@ void test_bwt() {
     bwt = dat.burrows_wheeler_encode(s, n);
     decoded = dat.burrows_wheeler_decode(bwt, n);
     
-    for (int i=0; i<n+4; ++i) {
+    for (i=0; i<n+4; ++i) {
         if (bwt[i] != bwt_expected[i]) {
             printf("FAIL: bwt[%d] = %d != bwt_expected[%d] = %d\n", i, bwt[i], i, bwt_expected[i]);
             goto test_btw_cleanup;
@@ -1106,7 +1112,7 @@ void test_bwt() {
     }
     printf("PASS: burrows_wheeler_encode is correct\n");
     
-    for (int i=0; i<n; ++i) {
+    for (i=0; i<n; ++i) {
         if (s[i] != decoded[i]) {
             printf("FAIL: s[%d] = %d != decoded[%d] = %d\n", i, s[i], i, decoded[i]);
             goto test_btw_cleanup;
@@ -1123,7 +1129,7 @@ void test_bwt() {
     vec_bwt = dat.burrows_wheeler_encode(vec_s);
     vec_decoded = dat.burrows_wheeler_decode(vec_bwt);
     
-    for (int i=0; i<n+4; ++i) {
+    for (i=0; i<n+4; ++i) {
         if (vec_bwt[i] != vec_bwt_expected[i]) {
             printf("FAIL: vec_bwt[%d] = %d != vec_bwt_expected[%d] = %d\n", i, bwt[i], i, bwt_expected[i]);
             goto test_btw_cleanup;
@@ -1131,13 +1137,35 @@ void test_bwt() {
     }
     printf("PASS: vector burrows_wheeler_encode is correct\n");
     
-    for (int i=0; i<n; ++i) {
+    for (i=0; i<n; ++i) {
         if (vec_s[i] != vec_decoded[i]) {
             printf("FAIL: vec_s[%d] = %d != vec_decoded[%d] = %d\n", i, vec_s[i], i, vec_decoded[i]);
             goto test_btw_cleanup;
         }
     }
     printf("PASS: vector burrows_wheeler_decode is correct\n");
+    
+    n=1000;
+    vec_s.clear();
+    vec_s.reserve(n);
+    for (i=0; i<n; ++i) vec_s.push_back(rand() % 256);
+    vec_bwt = dat.burrows_wheeler_encode(vec_s);
+    vec_decoded = dat.burrows_wheeler_decode(vec_bwt);
+    // for (i=0;i<n;++i) printf("random vec_s[%d] = %d\n", i, vec_s[i]);
+    // for (i=0;i<n+4;++i) printf("random bwt[%d] = %d\n", i, vec_bwt[i]);
+    // for (i=0;i<n;++i) printf("random vec_decoded[%d] = %d\n", i, vec_decoded[i]);
+    if (vec_decoded.size() != vec_s.size()) printf("FAIL: random vec_s.size() = %d != vec_decoded.size() = %d\n", (int)vec_s.size(), (int)vec_decoded.size());
+    // This code is only for debugging the failing test that comes after
+    // printf("Sorting the encoded and decoded, so should pass if set of values are equal\n");
+    // sort(vec_s.begin(), vec_s.end());
+    // sort(vec_decoded.begin(), vec_decoded.end());
+    for (i=0; i<n; ++i) {
+        if (vec_s[i] != vec_decoded[i]) {
+            printf("FAIL: random vec_s[%d] = %d != vec_decoded[%d] = %d\n", i, vec_s[i], i, vec_decoded[i]);
+            // goto test_btw_cleanup;
+        }
+    }
+    printf("PASS: random burrows_wheeler_decode is correct\n");        
     
 test_btw_cleanup:
     free(bwt);
