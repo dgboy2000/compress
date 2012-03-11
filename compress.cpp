@@ -162,6 +162,7 @@ vector <int> DATCompression::compression(vector<int> data)
     compressed = run_length_encode(compressed);
     compressed = burrows_wheeler_encode(compressed);
     compressed = run_length_encode(compressed);
+    compressed = golomb_compress(compressed);
     compressed = huffman_compress(compressed);
 
     return compressed;
@@ -178,6 +179,7 @@ vector <int> DATCompression::decompression(vector<int> compressed)
 
   // bzip-inspired decompression stack (but simpler)
   decompressed = huffman_decompress(decompressed);
+  decompressed = golomb_decompress(decompressed);
   decompressed = run_length_decode(decompressed);
   decompressed = burrows_wheeler_decode(decompressed);
   decompressed = run_length_decode(decompressed);
