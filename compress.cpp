@@ -594,7 +594,9 @@ vector<int> DATCompression::diff_compress(vector<int> data) {
                 int diff = data[3 + L * (x_ind*y + y_ind) + L_ind] - val;
                 val = diff + val;
                 if (abs(diff) < 128) {
-                    compressed.push_back(diff + 127);
+                    if (diff > 0) compressed.push_back(2*diff-1);
+                    else compressed.push_back(-2*diff);
+                    // compressed.push_back(diff + 127);
                     continue;
                 }
                 
@@ -634,7 +636,8 @@ vector<int> DATCompression::diff_decompress(vector<int> compressed) {
             for (int L_ind=1; L_ind < L; ++L_ind) {
                 int diff = *(viter++);
                 if (diff < 255) {
-                    val = val + diff - 127;
+                    if (diff % 2 == 0) val = val - diff/2;
+                    else val = val + (diff+1)/2;
                     decompressed.push_back(val);
                     continue;
                 }
