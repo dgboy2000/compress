@@ -150,7 +150,7 @@ vector<int> DATCompression::identity_decompress(vector<int> compressed) {
 
 vector <int> DATCompression::compression(vector<int> data)
 {
-    vector <int> compressed = data; printf("Original size before compression: %d\n", (int)compressed.size());
+    vector <int> compressed = data;
     int i, n=30;
   
     // // Simple compression stack
@@ -158,20 +158,18 @@ vector <int> DATCompression::compression(vector<int> data)
     // compressed = huffman_compress(compressed);
 
     // bzip-inspired compression stack (but simpler)
-    compressed = diff_compress(compressed); printf("Size after diff compression: %d\n", (int)compressed.size());
-    // compressed = run_length_encode(compressed);
-    
-    for (i=0;i<n;++i) printf("Before bwt encoding compressed[%d]: %d\n", i, compressed[i]);
-    compressed = burrows_wheeler_encode(compressed); printf("Size after bwt encoding: %d\n", (int)compressed.size());
-    // compressed = run_length_encode(compressed);
-    // compressed = huffman_compress(compressed);
+    compressed = diff_compress(compressed);
+    compressed = run_length_encode(compressed);
+    compressed = burrows_wheeler_encode(compressed);
+    compressed = run_length_encode(compressed);
+    compressed = huffman_compress(compressed);
 
     return compressed;
 }
 
 vector <int> DATCompression::decompression(vector<int> compressed)
 {
-  vector <int> decompressed = compressed; printf("Original size before decompression: %d\n", (int)decompressed.size());
+  vector <int> decompressed = compressed;
   int i,n=30;
   
   // // Simple decompression stack
@@ -179,12 +177,11 @@ vector <int> DATCompression::decompression(vector<int> compressed)
   // decompressed = diff_decompress(decompressed);
 
   // bzip-inspired decompression stack (but simpler)
-  // decompressed = huffman_decompress(compressed);
-  // decompressed = run_length_decode(decompressed);
-  decompressed = burrows_wheeler_decode(decompressed); printf("Size after bwt decoding: %d\n", (int)decompressed.size());
-  for (i=0;i<n;++i) printf("After bwt decoding decompressed[%d]: %d\n", i, decompressed[i]);
-  // decompressed = run_length_decode(decompressed);
-  decompressed = diff_decompress(decompressed); printf("Size after diff decompression: %d\n", (int)decompressed.size());
+  decompressed = huffman_decompress(decompressed);
+  decompressed = run_length_decode(decompressed);
+  decompressed = burrows_wheeler_decode(decompressed);
+  decompressed = run_length_decode(decompressed);
+  decompressed = diff_decompress(decompressed);
 
   return decompressed;
 }
@@ -1151,18 +1148,10 @@ void test_bwt() {
     for (i=0; i<n; ++i) vec_s.push_back(rand() % 256);
     vec_bwt = dat.burrows_wheeler_encode(vec_s);
     vec_decoded = dat.burrows_wheeler_decode(vec_bwt);
-    // for (i=0;i<n;++i) printf("random vec_s[%d] = %d\n", i, vec_s[i]);
-    // for (i=0;i<n+4;++i) printf("random bwt[%d] = %d\n", i, vec_bwt[i]);
-    // for (i=0;i<n;++i) printf("random vec_decoded[%d] = %d\n", i, vec_decoded[i]);
-    if (vec_decoded.size() != vec_s.size()) printf("FAIL: random vec_s.size() = %d != vec_decoded.size() = %d\n", (int)vec_s.size(), (int)vec_decoded.size());
-    // This code is only for debugging the failing test that comes after
-    // printf("Sorting the encoded and decoded, so should pass if set of values are equal\n");
-    // sort(vec_s.begin(), vec_s.end());
-    // sort(vec_decoded.begin(), vec_decoded.end());
     for (i=0; i<n; ++i) {
         if (vec_s[i] != vec_decoded[i]) {
             printf("FAIL: random vec_s[%d] = %d != vec_decoded[%d] = %d\n", i, vec_s[i], i, vec_decoded[i]);
-            // goto test_btw_cleanup;
+            goto test_btw_cleanup;
         }
     }
     printf("PASS: random burrows_wheeler_decode is correct\n");        
@@ -1321,7 +1310,7 @@ int main() {
     
     // test_compression_on_file("data/test.tab");
 
-    // test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
+    test_compression_on_file("data/B28-39_100_100_acq_0007.tab");
     // test_compression_on_file("data/B28-39_100_100_acq_0400.tab");
     //test_compression_on_file("data/B28-39_1600_1000_acq_0007.tab");
     // test_compression_on_file("data/B28-39_1600_1000_acq_0400.tab");
